@@ -17,6 +17,6 @@ RUN cargo build
 
 COPY . .
 
-EXPOSE 3000
+EXPOSE 8080
 
 CMD ["cargo", "watch", "-x", "run"]

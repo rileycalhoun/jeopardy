@@ -1,5 +1,12 @@
-use axum::{Router, routing::get};
+use axum::{
+    Json, Router,
+    http::{Method, StatusCode, header},
+    routing::get,
+};
+use rand::{RngExt, distr::Alphanumeric};
+use serde::{Deserialize, Serialize};
 use tokio::net::TcpListener;
+use tower_http::cors::CorsLayer;
 use tracing::{error, info};
 use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -36,7 +43,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
-    let root_handler = Router::new().route("/", get(root));
+    let cors = CorsLayer::new()
+        .allow_origin(["http://localhost:5173".parse().unwrap()])
+        .allow_methods([Method::GET])
+        .allow_headers([header::CONTENT_TYPE]);
+
+    let root_handler = Router::new()
+        .route("/games/new", get(create_new_game))
+        .layer(cors);
     info!("listening on {}:{}", &bind_address, &bind_port);
 
     // Keep bind and serve errors separate so the logs show which phase failed.
@@ -59,6 +73,35 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 }
 
-async fn root() -> &'static str {
-    "Hello, world!"
+#[derive(Serialize, Deserialize)]
+struct GameData {
+    game_id: String,
+    admin_code: usize,
+    player_code: usize,
+}
+
+async fn create_new_game() -> (StatusCode, Json<GameData>) {
+    // Generate new game_id
+    let game_id: String = rand::rng()
+        .sample_iter(&Alphanumeric)
+        .take(6)
+        .map(char::from)
+        .collect();
+
+    // Generate new admin_code
+    let admin_code: usize = rand::rng().random_range(100_000..1_000_000);
+
+    // Generate new player_code
+    let player_code: usize = rand::rng().random_range(100_000..1_000_000);
+
+    // TODO: Check for any duplicates in SQLx
+
+    (
+        StatusCode::OK,
+        Json(GameData {
+            game_id,
+            admin_code,
+            player_code,
+        }),
+    )
 }
