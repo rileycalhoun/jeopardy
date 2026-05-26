@@ -1,0 +1,7 @@
+CREATE TABLE games (
+    id BIGSERIAL PRIMARY KEY,
+    game_id TEXT NOT NULL UNIQUE,
+    admin_code INTEGER NOT NULL UNIQUE,
+    player_code INTEGER NOT NULL UNIQUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);

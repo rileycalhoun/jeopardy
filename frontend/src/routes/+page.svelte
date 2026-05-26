@@ -1,37 +1,48 @@
 <script lang="ts">
-	import { PUBLIC_API_URL } from '$env/static/public';
+	import { newGame } from '$lib/api/games';
 
-	type GameData = {
-		game_id: string;
-		admin_code: number;
-		player_code: number;
-	};
+	let game_id: string | undefined = $state(undefined);
+	let admin_code: number | undefined = $state(undefined);
+	let player_code: number | undefined = $state(undefined);
+	let error_message = $state('');
 
-	let game: GameData | null = $state(null);
-	let error = $state('');
-
-	async function createGame() {
-		error = '';
-		game = null;
-
-		const res = await fetch(`${PUBLIC_API_URL}/games/new`);
-		if (!res.ok) {
-			error = 'Request failed with error code: ' + res.status;
+	async function buttonClick() {
+		let result = await newGame();
+		if (result.ok) {
+			game_id = result.value.game_id;
+			admin_code = result.value.admin_code;
+			player_code = result.value.player_code;
+			error_message = '';
 			return;
 		}
 
-		game = (await res.json()) as GameData;
+		switch (result.error.kind) {
+			case 'NetworkError':
+				error_message = 'Could not reach the server.';
+				break;
+			case 'HttpError':
+				error_message = `Server returned ${result.error.status}`;
+				break;
+			case 'JsonParseError':
+				error_message = 'Server returned invalid JSON.';
+				break;
+			case 'ValidationError':
+				error_message = 'Server returned unexpected data.';
+				break;
+		}
 	}
 </script>
 
-<button onclick={createGame}>Create Game</button>
+<button onclick={buttonClick}>Create Game</button>
 
-{#if error}
-	<p>{error}</p>
+{#if error_message}
+	<p>{error_message}</p>
 {/if}
 
-{#if game}
-	<p>Game ID: {game.game_id}</p>
-	<p>Admin code: {game.admin_code}</p>
-	<p>Player code: {game.player_code}</p>
+{#if game_id != undefined && admin_code != undefined && player_code != undefined}
+	<p>Game ID: {game_id}</p>
+	<p>Admin code: {admin_code}</p>
+	<p>Player code: {player_code}</p>
+{:else}
+	<p>Click the button to create a game!</p>
 {/if}

@@ -1,4 +1,25 @@
 services:
+  database:
+    image: postgres:18
+    restart: always
+    shm_size: 128mb
+    volumes:
+      - postgres:/var/lib/postgresql
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: docker
+    ports:
+      - "5432:5432"
+
+  adminer:
+    image: adminer:latest
+    restart: always
+    ports:
+      - 8000:8080
+    depends_on:
+      - database
+
   backend:
     build:
       context: ./backend
@@ -11,11 +32,13 @@ services:
       - cargo-registry:/usr/local/cargo/registry
       - cargo-git:/usr/local/cargo/git
     environment:
-      DATABASE_URL: sqlite:/data/jeopardy.sqlite
+      DATABASE_URL: postgres://postgres:password@database:5432/docker
       RUST_LOG: debug
       BIND_ADDRESS: 0.0.0.0
       BIND_PORT: 8080
     command: cargo watch -x run
+    depends_on:
+      - database
 
   frontend:
     build:
@@ -32,6 +55,7 @@ services:
       - backend
 
 volumes:
+  postgres:
   backend-target:
   cargo-registry:
   cargo-git:
