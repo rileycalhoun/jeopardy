@@ -42,6 +42,10 @@
 		const result = await getPlayerLobby(code);
 		if (result.ok) {
 			lobby = result.value;
+			if (result.value.current_player_id !== undefined) {
+				currentPlayerId = result.value.current_player_id;
+				localStorage.setItem(`jeopardy-player-id-${code}`, `${result.value.current_player_id}`);
+			}
 			if (!game) errorMessage = '';
 			return;
 		}
@@ -85,7 +89,15 @@
 	});
 
 	async function sendAnswer() {
-		if (playerCode === null || currentPlayerId === null || answerInput.trim() === '') return;
+		if (playerCode === null || currentPlayerId === null) {
+			answerMessage = 'Choose your player name before submitting.';
+			return;
+		}
+
+		if (answerInput.trim() === '') {
+			answerMessage = 'Enter an answer before submitting.';
+			return;
+		}
 
 		const result = await submitPlayerAnswer(playerCode, currentPlayerId, answerInput);
 		if (result.ok) {
@@ -97,6 +109,13 @@
 
 		answerMessage = '';
 		errorMessage = toMessage(result.error);
+	}
+
+	function choosePlayer(playerId: number) {
+		currentPlayerId = playerId;
+		if (playerCode !== null) {
+			localStorage.setItem(`jeopardy-player-id-${playerCode}`, `${playerId}`);
+		}
 	}
 </script>
 
@@ -152,6 +171,44 @@
 						<p class="text-sm text-slate-300">Status</p>
 						<p class="mt-1 font-semibold">{game.phase === 'RoundSelection' ? 'Waiting for host' : game.phase}</p>
 					</div>
+
+					<div class="rounded-md border border-sky-300/25 bg-white/5 p-4">
+						<h2 class="font-semibold">Submit Answer</h2>
+						{#if currentPlayerId === null}
+							<label class="mt-3 block text-sm text-slate-300" for="player-identity">Player</label>
+							<select
+								id="player-identity"
+								class="mt-1 w-full rounded-md border border-white/10 bg-slate-950 px-3 py-2 text-white"
+								onchange={(event) => choosePlayer(Number(event.currentTarget.value))}
+							>
+								<option value="">Choose your name</option>
+								{#each game.players as player}
+									<option value={player.id}>{player.name}</option>
+								{/each}
+							</select>
+						{:else}
+							<p class="mt-2 text-sm text-slate-300">
+								Playing as {game.players.find((player) => player.id === currentPlayerId)?.name ?? 'selected player'}
+							</p>
+						{/if}
+
+						<textarea
+							bind:value={answerInput}
+							class="mt-3 min-h-24 w-full resize-y rounded-md border border-white/10 bg-slate-950 px-3 py-2 text-white disabled:opacity-50"
+							disabled={!game.active_clue}
+							placeholder={game.active_clue ? 'Type your response' : 'Waiting for the host to select a clue'}
+						></textarea>
+						<button
+							class="mt-3 w-full rounded-md bg-sky-300 px-4 py-2 font-semibold text-slate-950 disabled:opacity-50"
+							disabled={!game.active_clue}
+							onclick={sendAnswer}
+						>
+							Submit Answer
+						</button>
+						{#if answerMessage}
+							<p class="mt-3 text-sm text-sky-200">{answerMessage}</p>
+						{/if}
+					</div>
 				</aside>
 			</section>
 
@@ -159,23 +216,7 @@
 				<section class="rounded-md border border-sky-300/25 bg-slate-900 p-5">
 					<p class="text-sm text-sky-200">{game.active_clue.label} · {game.active_clue.value}</p>
 					<h2 class="mt-2 text-2xl font-semibold">{game.active_clue.question}</h2>
-					{#if currentPlayerId === null}
-						<p class="mt-3 text-slate-300">Rejoin from the home page to submit answers from this browser.</p>
-					{:else}
-						<div class="mt-4 flex flex-col gap-3 sm:flex-row">
-							<input
-								bind:value={answerInput}
-								class="min-w-0 flex-1 rounded-md border border-white/10 bg-slate-950 px-3 py-2 text-white"
-								placeholder="Your answer"
-							/>
-							<button class="rounded-md bg-sky-300 px-4 py-2 font-semibold text-slate-950" onclick={sendAnswer}>
-								Submit
-							</button>
-						</div>
-						{#if answerMessage}
-							<p class="mt-3 text-sm text-sky-200">{answerMessage}</p>
-						{/if}
-					{/if}
+					<p class="mt-3 text-slate-300">Use the answer box beside the scoreboard to submit your response.</p>
 				</section>
 			{/if}
 		{:else if lobby}

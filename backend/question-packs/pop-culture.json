@@ -1,0 +1,191 @@
+{
+  "id": "pop-culture",
+  "title": "Pop Culture Mix",
+  "rounds": [
+    {
+      "name": "Jeopardy",
+      "categories": [
+        {
+          "title": "Movies",
+          "clues": [
+            {
+              "label": "$200",
+              "question": "This 1997 film centers on Jack and Rose aboard a doomed ocean liner.",
+              "answer": "What is Titanic?",
+              "value": 200
+            },
+            {
+              "label": "$400",
+              "question": "This superhero team first assembled on film in a 2012 Marvel blockbuster.",
+              "answer": "Who are the Avengers?",
+              "value": 400
+            },
+            {
+              "label": "$600",
+              "question": "This 1985 time-travel comedy sends Marty McFly to 1955.",
+              "answer": "What is Back to the Future?",
+              "value": 600
+            },
+            {
+              "label": "$800",
+              "question": "This animated cowboy is voiced by Tom Hanks in the Toy Story films.",
+              "answer": "Who is Woody?",
+              "value": 800
+            },
+            {
+              "label": "$1000",
+              "question": "This movie musical features the songs 'Dancing Queen' and 'Mamma Mia'.",
+              "answer": "What is Mamma Mia!?",
+              "value": 1000
+            }
+          ]
+        },
+        {
+          "title": "TV",
+          "clues": [
+            {
+              "label": "$200",
+              "question": "This sitcom follows six friends living in New York City.",
+              "answer": "What is Friends?",
+              "value": 200
+            },
+            {
+              "label": "$400",
+              "question": "This animated family lives at 742 Evergreen Terrace.",
+              "answer": "Who are the Simpsons?",
+              "value": 400
+            },
+            {
+              "label": "$600",
+              "question": "This fantasy series features houses Stark, Lannister, and Targaryen.",
+              "answer": "What is Game of Thrones?",
+              "value": 600
+            },
+            {
+              "label": "$800",
+              "question": "This mockumentary sitcom is set largely inside the Scranton branch of Dunder Mifflin.",
+              "answer": "What is The Office?",
+              "value": 800
+            },
+            {
+              "label": "$1000",
+              "question": "This sci-fi series begins when a group of kids in Hawkins, Indiana encounters the Upside Down.",
+              "answer": "What is Stranger Things?",
+              "value": 1000
+            }
+          ]
+        },
+        {
+          "title": "Music",
+          "clues": [
+            {
+              "label": "$200",
+              "question": "This singer is known as the Queen of Pop and released the album Like a Virgin.",
+              "answer": "Who is Madonna?",
+              "value": 200
+            },
+            {
+              "label": "$400",
+              "question": "This British band released albums including Abbey Road and Sgt. Pepper's Lonely Hearts Club Band.",
+              "answer": "Who are the Beatles?",
+              "value": 400
+            },
+            {
+              "label": "$600",
+              "question": "This artist released the albums 1989, Folklore, and Midnights.",
+              "answer": "Who is Taylor Swift?",
+              "value": 600
+            },
+            {
+              "label": "$800",
+              "question": "This performer is often called the King of Pop.",
+              "answer": "Who is Michael Jackson?",
+              "value": 800
+            },
+            {
+              "label": "$1000",
+              "question": "This Seattle band helped popularize grunge with the album Nevermind.",
+              "answer": "Who is Nirvana?",
+              "value": 1000
+            }
+          ]
+        },
+        {
+          "title": "Games",
+          "clues": [
+            {
+              "label": "$200",
+              "question": "This yellow arcade character eats pellets while avoiding ghosts.",
+              "answer": "Who is Pac-Man?",
+              "value": 200
+            },
+            {
+              "label": "$400",
+              "question": "This Nintendo plumber is famous for jumping on Goombas and rescuing Princess Peach.",
+              "answer": "Who is Mario?",
+              "value": 400
+            },
+            {
+              "label": "$600",
+              "question": "This party game series asks players to draw cards labeled wild, reverse, and skip.",
+              "answer": "What is Uno?",
+              "value": 600
+            },
+            {
+              "label": "$800",
+              "question": "This sandbox game lets players build with blocks and survive creepers.",
+              "answer": "What is Minecraft?",
+              "value": 800
+            },
+            {
+              "label": "$1000",
+              "question": "This fantasy series follows Link across Hyrule in many Nintendo adventures.",
+              "answer": "What is The Legend of Zelda?",
+              "value": 1000
+            }
+          ]
+        },
+        {
+          "title": "Celebrities",
+          "clues": [
+            {
+              "label": "$200",
+              "question": "This actor played Captain Jack Sparrow in the Pirates of the Caribbean films.",
+              "answer": "Who is Johnny Depp?",
+              "value": 200
+            },
+            {
+              "label": "$400",
+              "question": "This performer starred as Elle Woods in Legally Blonde.",
+              "answer": "Who is Reese Witherspoon?",
+              "value": 400
+            },
+            {
+              "label": "$600",
+              "question": "This actor played Iron Man in the Marvel Cinematic Universe.",
+              "answer": "Who is Robert Downey Jr.?",
+              "value": 600
+            },
+            {
+              "label": "$800",
+              "question": "This media personality built a beauty and fashion empire with the brand SKIMS.",
+              "answer": "Who is Kim Kardashian?",
+              "value": 800
+            },
+            {
+              "label": "$1000",
+              "question": "This actor won an Academy Award for playing the lead role in Forrest Gump.",
+              "answer": "Who is Tom Hanks?",
+              "value": 1000
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "final_jeopardy": {
+    "category": "Pop Icons",
+    "question": "This fictional character from a galaxy far, far away is known for the line about being someone's father.",
+    "answer": "Who is Darth Vader?"
+  }
+}

@@ -261,18 +261,23 @@
 						</div>
 						{#if game.active_clue.submissions.length > 0}
 							<div class="mt-5">
-								<h3 class="text-sm font-semibold text-slate-300">Submissions</h3>
-								<div class="mt-2 space-y-2">
+								<h3 class="text-sm font-semibold text-slate-300">Answer Cards</h3>
+								<div class="mt-3 grid gap-3 md:grid-cols-2">
 									{#each game.active_clue.submissions as submission}
 										<button
-											class="w-full rounded-md border border-white/10 bg-slate-950 px-3 py-2 text-left hover:border-amber-300/60"
+											class="min-h-28 rounded-md border border-white/10 bg-slate-950 p-4 text-left transition hover:border-amber-300/60 data-[selected=true]:border-amber-300 data-[selected=true]:bg-amber-300/10"
+											data-selected={selectedPlayerId === submission.player_id}
 											onclick={() => (selectedPlayerId = submission.player_id)}
 										>
-											<span class="font-semibold">{submission.player_name}</span>
-											<span class="ml-2 text-slate-300">{submission.answer}</span>
+											<span class="block text-sm font-semibold text-amber-200">{submission.player_name}</span>
+											<span class="mt-2 block text-lg text-white">{submission.answer}</span>
 										</button>
 									{/each}
 								</div>
+							</div>
+						{:else}
+							<div class="mt-5 rounded-md border border-white/10 bg-slate-950 p-4 text-sm text-slate-300">
+								Submitted answers will appear here as cards.
 							</div>
 						{/if}
 					</section>
