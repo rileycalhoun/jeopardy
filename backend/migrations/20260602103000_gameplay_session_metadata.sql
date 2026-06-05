@@ -1,0 +1,14 @@
+ALTER TABLE games
+ADD COLUMN status TEXT NOT NULL DEFAULT 'lobby',
+ADD COLUMN question_pack_id TEXT,
+ADD COLUMN started_at TIMESTAMPTZ,
+ADD COLUMN completed_at TIMESTAMPTZ;
+
+CREATE TABLE admin_tokens (
+    id BIGSERIAL PRIMARY KEY,
+    game_id BIGINT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+    token_hash TEXT NOT NULL UNIQUE,
+    label TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    revoked_at TIMESTAMPTZ
+);

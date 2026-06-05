@@ -1,0 +1,4 @@
+# seed case_index note
+7 0 baseline replay
+42 0 small mixed board replay
+1337 0 longer random board replay
