@@ -1,3 +1,36 @@
-backend/target
+# Rust
+target/
+backend/target/
+
+# Node / SvelteKit
+node_modules/
+frontend/node_modules/
+frontend/.svelte-kit/
+frontend/build/
+frontend/.vite/
+frontend/.output/
+
+# Local environment files
+.env
+.env.*
 backend/.env
+backend/.env.*
+frontend/.env
+frontend/.env.*
+!.env.example
+!*.env.example
+!.env.test
+!*.env.test
+
+# Local runtime data
 data/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Logs
+*.log
+npm-debug.log*

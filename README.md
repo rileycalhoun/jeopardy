@@ -32,36 +32,89 @@ frontend/  SvelteKit, TypeScript, Tailwind, Vitest
 docs/      Backend gameplay design, implementation plan, and testing notes
 ```
 
-## Running Locally
+## Running With Docker
 
-Start the full stack:
+This project has separate Docker setups for development and production.
+
+Development Docker uses `docker-compose.dev.yml`, bind-mounted source directories,
+`cargo watch`, and the Vite dev server:
 
 ```bash
-docker compose up
+docker compose -f docker-compose.dev.yml up --build
 ```
 
-Default services:
+Development services:
 
 - Frontend: `http://localhost:5173`
 - Backend: `http://localhost:8080`
 - Adminer: `http://localhost:8000`
 - Postgres: `localhost:5432`
 
-Backend env vars:
+Production Docker uses `docker-compose.yml`, builds optimized backend/frontend
+artifacts, and runs the compiled Rust binary plus the SvelteKit Node server:
+
+```bash
+docker compose up --build
+```
+
+Production services:
+
+- Frontend: `http://localhost:3000`
+- Backend: `http://localhost:8080`
+- Adminer: `http://localhost:8000`
+- Postgres: `localhost:5432`
+
+The `postgres` Docker volume is used for database persistence.
+
+## Environment Variables
+
+Backend variables:
 
 ```text
 DATABASE_URL=postgres://postgres:password@database:5432/docker
 BIND_ADDRESS=0.0.0.0
 BIND_PORT=8080
-FRONTEND_ORIGIN=http://localhost:5173
-QUESTION_PACK_DIR=./question-packs
+FRONTEND_ORIGIN=http://localhost:3000
+QUESTION_PACK_DIR=/app/question-packs
+RUST_LOG=info
 ```
+
+Frontend variables:
+
+```text
+PUBLIC_API_URL=http://localhost:8080
+HOST=0.0.0.0
+PORT=3000
+ORIGIN=http://localhost:3000
+```
+
+Database and published port variables:
+
+```text
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=<required for production>
+POSTGRES_DB=docker
+POSTGRES_PORT=5432
+BACKEND_PORT=8080
+FRONTEND_PORT=3000
+ADMINER_PORT=8000
+```
+
+For production Docker, `POSTGRES_PASSWORD` must be set in the environment or a
+local `.env` file before running `docker compose up --build`. For deployed
+production, set `PUBLIC_API_URL` to the browser-visible backend URL and set
+`FRONTEND_ORIGIN` to the public frontend origin used for CORS and SvelteKit
+origin checks. A reverse proxy should route public traffic to the frontend on
+port `3000` and the backend API on port `8080`.
 
 For running the backend directly from `backend/`, use a localhost database URL:
 
 ```bash
 DATABASE_URL=postgres://postgres:password@127.0.0.1:5432/docker cargo run
 ```
+
+The production frontend container uses `@sveltejs/adapter-node` and starts with
+`node build`. The development frontend container still uses `npm run dev`.
 
 ## Gameplay Flow
 
