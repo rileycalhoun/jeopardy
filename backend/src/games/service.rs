@@ -1,11 +1,19 @@
 use crate::{
+    content::service::build_scenario,
+    domain::jeopardy::{GameAction, GamePhase, JeopardyGame},
     error::AppError,
     games::{
-        codes,
-        models::{GameData, JoinAdminRequest, JoinGameRequest, LobbyResponse},
+        auth, codes,
+        models::{
+            AnswerRequest, FinishGameResponse, GameData, GameStateResponse, JoinAdminRequest,
+            JoinGameRequest, LobbyResponse, PlayerAnswerRequest, QuestionPacksResponse,
+            ResolveRequest, SelectClueRequest, StartGameRequest, WagerRequest,
+        },
         repository::{self, find_game_by_admin_code, find_game_by_player_code},
+        state::build_game_view,
     },
     players,
+    sessions::{manager::SessionError, runtime::RuntimeSession},
     state::AppState,
 };
 
@@ -40,8 +48,14 @@ pub(crate) async fn join_game(
         Err(err) => return Err(AppError::Database(err)),
     };
 
-    match players::repository::insert_player(&state.pool, game.id, request.display_name).await {
-        Ok(_) => {}
+    let joined_player = match players::repository::insert_player(
+        &state.pool,
+        game.id,
+        request.display_name,
+    )
+    .await
+    {
+        Ok(player) => player,
         Err(err) => {
             if let Some(db_err) = err.as_database_error() {
                 if db_err.is_unique_violation() {
@@ -51,14 +65,20 @@ pub(crate) async fn join_game(
 
             return Err(AppError::Database(err));
         }
-    }
+    };
 
     let players = match players::repository::list_players_for_game(&state.pool, game.id).await {
         Ok(players) => players,
-        Err(err) => return Err(AppError::Database(err)),
+        Err(err) => {
+            return Err(AppError::Database(err));
+        }
     };
 
-    Ok(LobbyResponse { players })
+    Ok(LobbyResponse {
+        players,
+        admin_token: None,
+        current_player_id: Some(joined_player.id),
+    })
 }
 
 pub(crate) async fn get_lobby_by_player_code(
@@ -76,7 +96,11 @@ pub(crate) async fn get_lobby_by_player_code(
         Err(err) => return Err(AppError::Database(err)),
     };
 
-    Ok(LobbyResponse { players })
+    Ok(LobbyResponse {
+        players,
+        admin_token: None,
+        current_player_id: None,
+    })
 }
 
 pub(crate) async fn join_game_as_admin(
@@ -94,7 +118,17 @@ pub(crate) async fn join_game_as_admin(
         Err(err) => return Err(AppError::Database(err)),
     };
 
-    Ok(LobbyResponse { players })
+    let token = auth::generate_admin_token();
+    let token_hash = auth::hash_admin_token(&token);
+    repository::insert_admin_token(&state.pool, game.id, token_hash, "admin".to_owned())
+        .await
+        .map_err(AppError::Database)?;
+
+    Ok(LobbyResponse {
+        players,
+        admin_token: Some(token),
+        current_player_id: None,
+    })
 }
 
 pub(crate) async fn get_lobby_by_admin_code(
@@ -112,5 +146,308 @@ pub(crate) async fn get_lobby_by_admin_code(
         Err(err) => return Err(AppError::Database(err)),
     };
 
-    Ok(LobbyResponse { players })
+    Ok(LobbyResponse {
+        players,
+        admin_token: None,
+        current_player_id: None,
+    })
+}
+
+pub(crate) fn list_question_packs(state: &AppState) -> Result<QuestionPacksResponse, AppError> {
+    let packs = state
+        .question_packs
+        .list()
+        .map_err(AppError::QuestionPack)?;
+    Ok(QuestionPacksResponse { packs })
+}
+
+pub(crate) async fn start_game(
+    state: &AppState,
+    admin_code: i32,
+    token: Option<&str>,
+    request: StartGameRequest,
+) -> Result<GameStateResponse, AppError> {
+    let game = find_game_by_admin_code(&state.pool, admin_code)
+        .await
+        .map_err(AppError::Database)?
+        .ok_or(AppError::GameNotFound)?;
+    validate_admin_token(state, game.id, token).await?;
+
+    if state.sessions.state(game.id).await.is_ok() {
+        return Err(AppError::GameAlreadyStarted);
+    }
+
+    let players = players::repository::list_players_for_game(&state.pool, game.id)
+        .await
+        .map_err(AppError::Database)?;
+    let pack = state
+        .question_packs
+        .load(&request.question_pack_id)
+        .map_err(AppError::QuestionPack)?;
+    let scenario = build_scenario(&pack, &players).map_err(AppError::QuestionPack)?;
+    let engine =
+        JeopardyGame::new(scenario).map_err(|err| AppError::Gameplay(format!("{err:?}")))?;
+
+    repository::mark_game_started(&state.pool, game.id, pack.id.clone())
+        .await
+        .map_err(AppError::Database)?;
+
+    state
+        .sessions
+        .create(RuntimeSession::new(
+            game.id,
+            pack.id.clone(),
+            pack.clone(),
+            players,
+            engine,
+        ))
+        .await;
+
+    game_state_by_admin_code(state, admin_code).await
+}
+
+pub(crate) async fn game_state_by_admin_code(
+    state: &AppState,
+    admin_code: i32,
+) -> Result<GameStateResponse, AppError> {
+    let game = find_game_by_admin_code(&state.pool, admin_code)
+        .await
+        .map_err(AppError::Database)?
+        .ok_or(AppError::GameNotFound)?;
+    game_state_by_game_id(state, game.id, true).await
+}
+
+pub(crate) async fn game_state_by_player_code(
+    state: &AppState,
+    player_code: i32,
+) -> Result<GameStateResponse, AppError> {
+    let game = find_game_by_player_code(&state.pool, player_code)
+        .await
+        .map_err(AppError::Database)?
+        .ok_or(AppError::GameNotFound)?;
+    game_state_by_game_id(state, game.id, false).await
+}
+
+pub(crate) async fn submit_player_answer(
+    state: &AppState,
+    player_code: i32,
+    request: PlayerAnswerRequest,
+) -> Result<GameStateResponse, AppError> {
+    let game = find_game_by_player_code(&state.pool, player_code)
+        .await
+        .map_err(AppError::Database)?
+        .ok_or(AppError::GameNotFound)?;
+
+    state
+        .sessions
+        .submit_answer(game.id, request.player_id, request.answer)
+        .await
+        .map_err(session_error)?;
+
+    game_state_by_game_id(state, game.id, false).await
+}
+
+pub(crate) async fn select_clue(
+    state: &AppState,
+    admin_code: i32,
+    token: Option<&str>,
+    request: SelectClueRequest,
+) -> Result<GameStateResponse, AppError> {
+    let game = authenticated_admin_game(state, admin_code, token).await?;
+    let current_selector = state
+        .sessions
+        .state(game.id)
+        .await
+        .map_err(session_error)?
+        .current_selector;
+    apply_action(
+        state,
+        game.id,
+        GameAction::SelectClue {
+            player_id: current_selector,
+            category_index: request.category_index,
+            clue_index: request.clue_index,
+        },
+    )
+    .await
+}
+
+pub(crate) async fn answer_clue(
+    state: &AppState,
+    admin_code: i32,
+    token: Option<&str>,
+    request: AnswerRequest,
+) -> Result<GameStateResponse, AppError> {
+    let game = authenticated_admin_game(state, admin_code, token).await?;
+    apply_action(
+        state,
+        game.id,
+        GameAction::AttemptAnswer {
+            player_id: request.player_id,
+            correct: request.correct,
+        },
+    )
+    .await
+}
+
+pub(crate) async fn daily_double_wager(
+    state: &AppState,
+    admin_code: i32,
+    token: Option<&str>,
+    request: WagerRequest,
+) -> Result<GameStateResponse, AppError> {
+    let game = authenticated_admin_game(state, admin_code, token).await?;
+    apply_action(
+        state,
+        game.id,
+        GameAction::SubmitDailyDoubleWager {
+            player_id: request.player_id,
+            amount: request.amount,
+        },
+    )
+    .await
+}
+
+pub(crate) async fn daily_double_resolve(
+    state: &AppState,
+    admin_code: i32,
+    token: Option<&str>,
+    request: ResolveRequest,
+) -> Result<GameStateResponse, AppError> {
+    let game = authenticated_admin_game(state, admin_code, token).await?;
+    apply_action(
+        state,
+        game.id,
+        GameAction::ResolveDailyDouble {
+            player_id: request.player_id,
+            correct: request.correct,
+        },
+    )
+    .await
+}
+
+pub(crate) async fn final_wager(
+    state: &AppState,
+    admin_code: i32,
+    token: Option<&str>,
+    request: WagerRequest,
+) -> Result<GameStateResponse, AppError> {
+    let game = authenticated_admin_game(state, admin_code, token).await?;
+    apply_action(
+        state,
+        game.id,
+        GameAction::SubmitFinalWager {
+            player_id: request.player_id,
+            amount: request.amount,
+        },
+    )
+    .await
+}
+
+pub(crate) async fn final_resolve(
+    state: &AppState,
+    admin_code: i32,
+    token: Option<&str>,
+    request: ResolveRequest,
+) -> Result<GameStateResponse, AppError> {
+    let game = authenticated_admin_game(state, admin_code, token).await?;
+    apply_action(
+        state,
+        game.id,
+        GameAction::ResolveFinalAnswer {
+            player_id: request.player_id,
+            correct: request.correct,
+        },
+    )
+    .await
+}
+
+pub(crate) async fn finish_game(
+    state: &AppState,
+    admin_code: i32,
+    token: Option<&str>,
+) -> Result<FinishGameResponse, AppError> {
+    let game = authenticated_admin_game(state, admin_code, token).await?;
+    repository::mark_game_completed(&state.pool, game.id)
+        .await
+        .map_err(AppError::Database)?;
+    state.sessions.remove(game.id).await;
+    Ok(FinishGameResponse { completed: true })
+}
+
+async fn apply_action(
+    state: &AppState,
+    game_id: i64,
+    action: GameAction,
+) -> Result<GameStateResponse, AppError> {
+    let engine_state = state
+        .sessions
+        .apply(game_id, action)
+        .await
+        .map_err(session_error)?;
+    if engine_state.phase == GamePhase::Completed {
+        repository::mark_game_completed(&state.pool, game_id)
+            .await
+            .map_err(AppError::Database)?;
+    }
+    game_state_by_game_id(state, game_id, true).await
+}
+
+async fn game_state_by_game_id(
+    state: &AppState,
+    game_id: i64,
+    include_answers: bool,
+) -> Result<GameStateResponse, AppError> {
+    state
+        .sessions
+        .with_session(game_id, |session| GameStateResponse {
+            game: build_game_view(
+                session.state(),
+                session.pack(),
+                include_answers,
+                session.submissions(),
+            ),
+        })
+        .await
+        .map_err(session_error)
+}
+
+async fn authenticated_admin_game(
+    state: &AppState,
+    admin_code: i32,
+    token: Option<&str>,
+) -> Result<crate::games::models::GameRow, AppError> {
+    let game = find_game_by_admin_code(&state.pool, admin_code)
+        .await
+        .map_err(AppError::Database)?
+        .ok_or(AppError::GameNotFound)?;
+    validate_admin_token(state, game.id, token).await?;
+    Ok(game)
+}
+
+async fn validate_admin_token(
+    state: &AppState,
+    game_id: i64,
+    token: Option<&str>,
+) -> Result<(), AppError> {
+    let token = token.ok_or(AppError::MissingAdminToken)?;
+    let token_hash = auth::hash_admin_token(token);
+    let row = repository::find_active_admin_token_by_hash(&state.pool, &token_hash)
+        .await
+        .map_err(AppError::Database)?
+        .ok_or(AppError::InvalidAdminToken)?;
+
+    if row.game_id != game_id {
+        return Err(AppError::WrongGameForToken);
+    }
+
+    Ok(())
+}
+
+fn session_error(err: SessionError) -> AppError {
+    match err {
+        SessionError::NotFound => AppError::SessionNotFound,
+        SessionError::Game(err) => AppError::Gameplay(format!("{err:?}")),
+        SessionError::InvalidSubmission(err) => AppError::Gameplay(err),
+    }
 }

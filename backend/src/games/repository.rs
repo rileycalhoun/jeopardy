@@ -15,18 +15,17 @@ pub async fn insert_game(
     admin_code: i32,
     player_code: i32,
 ) -> Result<Option<GameData>, sqlx::Error> {
-    sqlx::query_as!(
-        GameData,
+    sqlx::query_as::<_, GameData>(
         r#"
                 INSERT INTO games (game_id, admin_code, player_code)
                 VALUES ($1, $2, $3)
                 ON CONFLICT DO NOTHING
                 RETURNING game_id, admin_code, player_code
                 "#,
-        game_id,
-        admin_code,
-        player_code,
     )
+    .bind(game_id)
+    .bind(admin_code)
+    .bind(player_code)
     .fetch_optional(pool)
     .await
 }
@@ -35,15 +34,14 @@ pub async fn find_game_by_player_code(
     pool: &Pool<Postgres>,
     player_code: i32,
 ) -> Result<Option<GameRow>, sqlx::Error> {
-    sqlx::query_as!(
-        GameRow,
+    sqlx::query_as::<_, GameRow>(
         r#"
         SELECT id, game_id, admin_code, player_code
         FROM games
         WHERE player_code = $1
         "#,
-        player_code
     )
+    .bind(player_code)
     .fetch_optional(pool)
     .await
 }
@@ -52,15 +50,14 @@ pub async fn find_game_by_admin_code(
     pool: &Pool<Postgres>,
     admin_code: i32,
 ) -> Result<Option<GameRow>, sqlx::Error> {
-    sqlx::query_as!(
-        GameRow,
+    sqlx::query_as::<_, GameRow>(
         r#"
         SELECT id, game_id, admin_code, player_code
         FROM games
         WHERE admin_code = $1
         "#,
-        admin_code
     )
+    .bind(admin_code)
     .fetch_optional(pool)
     .await
 }
@@ -128,16 +125,15 @@ pub async fn find_active_admin_token_by_hash(
     pool: &Pool<Postgres>,
     token_hash: &str,
 ) -> Result<Option<AdminTokenRow>, sqlx::Error> {
-    sqlx::query_as!(
-        AdminTokenRow,
+    sqlx::query_as::<_, AdminTokenRow>(
         r#"
         SELECT game_id, token_hash, label
         FROM admin_tokens
         WHERE token_hash = $1
           AND revoked_at IS NULL
         "#,
-        token_hash
     )
+    .bind(token_hash)
     .fetch_optional(pool)
     .await
 }

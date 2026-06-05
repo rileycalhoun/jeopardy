@@ -12,6 +12,13 @@ pub enum AppError {
     GameCreationExhausted,
     GameNotFound,
     DuplicatePlayerName,
+    QuestionPack(String),
+    SessionNotFound,
+    Gameplay(String),
+    MissingAdminToken,
+    InvalidAdminToken,
+    WrongGameForToken,
+    GameAlreadyStarted,
 }
 
 #[derive(Serialize)]
@@ -53,6 +60,61 @@ impl IntoResponse for AppError {
                 StatusCode::CONFLICT,
                 Json(ErrorBody {
                     error: "duplicate_player_name",
+                }),
+            )
+                .into_response(),
+            AppError::QuestionPack(err) => {
+                tracing::warn!("question pack error: {}", err);
+                (
+                    StatusCode::BAD_REQUEST,
+                    Json(ErrorBody {
+                        error: "question_pack_error",
+                    }),
+                )
+                    .into_response()
+            }
+            AppError::SessionNotFound => (
+                StatusCode::NOT_FOUND,
+                Json(ErrorBody {
+                    error: "game_session_not_found",
+                }),
+            )
+                .into_response(),
+            AppError::Gameplay(err) => {
+                tracing::warn!("gameplay error: {}", err);
+                (
+                    StatusCode::BAD_REQUEST,
+                    Json(ErrorBody {
+                        error: "invalid_game_action",
+                    }),
+                )
+                    .into_response()
+            }
+            AppError::MissingAdminToken => (
+                StatusCode::UNAUTHORIZED,
+                Json(ErrorBody {
+                    error: "missing_admin_token",
+                }),
+            )
+                .into_response(),
+            AppError::InvalidAdminToken => (
+                StatusCode::UNAUTHORIZED,
+                Json(ErrorBody {
+                    error: "invalid_admin_token",
+                }),
+            )
+                .into_response(),
+            AppError::WrongGameForToken => (
+                StatusCode::FORBIDDEN,
+                Json(ErrorBody {
+                    error: "wrong_game_for_token",
+                }),
+            )
+                .into_response(),
+            AppError::GameAlreadyStarted => (
+                StatusCode::CONFLICT,
+                Json(ErrorBody {
+                    error: "game_already_started",
                 }),
             )
                 .into_response(),

@@ -3,10 +3,14 @@ use tokio::net::TcpListener;
 use tracing::{error, info};
 use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
-use crate::{app::build_app, config::Config, state::AppState};
+use crate::{
+    app::build_app, config::Config, content::loader::QuestionPackLoader,
+    sessions::manager::SessionManager, state::AppState,
+};
 
 pub mod app;
 pub mod config;
+pub mod content;
 pub mod db;
 pub mod domain;
 pub mod error;
@@ -57,7 +61,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Valid since checked above
     let pool = pool.unwrap();
-    let state = AppState { pool: pool };
+    let state = AppState {
+        pool: pool,
+        question_packs: QuestionPackLoader::new(&config.question_pack_dir),
+        sessions: SessionManager::default(),
+    };
     let handler = build_app(state, &config);
     info!(
         "listening on {}:{}",
