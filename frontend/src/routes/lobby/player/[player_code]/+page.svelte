@@ -20,8 +20,14 @@
 	let currentPlayerId = $state<number | null>(null);
 	let answerInput = $state('');
 	let answerMessage = $state('');
+	let lastActiveClueKey = $state<string | null>(null);
 	let errorMessage = $state('');
 	let isLoading = $state(true);
+	let activeClueKey = $derived(
+		game?.active_clue
+			? `${game.active_clue.round_index}:${game.active_clue.category_index}:${game.active_clue.clue_index}`
+			: null
+	);
 
 	function toMessage(error: FetchError): string {
 		switch (error.kind) {
@@ -86,6 +92,14 @@
 		}, 2500);
 
 		return () => window.clearInterval(interval);
+	});
+
+	$effect(() => {
+		if (activeClueKey !== lastActiveClueKey) {
+			lastActiveClueKey = activeClueKey;
+			answerInput = '';
+			answerMessage = '';
+		}
 	});
 
 	async function sendAnswer() {

@@ -1,4 +1,4 @@
-# Jeopardy Clone
+# Jeopardy
 
 A work-in-progress host-controlled Jeopardy game with a Rust/Axum backend, SvelteKit frontend, and Postgres via SQLx.
 

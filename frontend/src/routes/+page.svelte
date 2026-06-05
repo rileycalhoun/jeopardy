@@ -109,7 +109,7 @@
 </script>
 
 <svelte:head>
-	<title>Jeopardy Clone Lobby</title>
+	<title>Jeopardy Lobby</title>
 </svelte:head>
 
 <div
@@ -117,7 +117,7 @@
 >
 	<div class="mx-auto flex max-w-6xl flex-col gap-10">
 		<section class="max-w-3xl">
-			<p class="text-sm tracking-[0.35em] text-amber-300 uppercase">Jeopardy Clone</p>
+			<p class="text-sm tracking-[0.35em] text-amber-300 uppercase">Jeopardy</p>
 			<h1 class="mt-4 font-serif text-5xl leading-tight text-white md:text-6xl">
 				Create a room, join as a player, or moderate as host.
 			</h1>
