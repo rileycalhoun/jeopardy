@@ -51,7 +51,8 @@ Development services:
 - Postgres: `localhost:5432`
 
 Production Docker uses `docker-compose.yml`, builds optimized backend/frontend
-artifacts, and runs the compiled Rust binary plus the SvelteKit Node server:
+artifacts, runs database migrations, and starts the compiled Rust binary plus
+the SvelteKit Node server:
 
 ```bash
 docker compose up --build
@@ -65,6 +66,8 @@ Production services:
 - Postgres: `localhost:5432`
 
 The `postgres` Docker volume is used for database persistence.
+The production `migrate` service runs `sqlx migrate run` after Postgres becomes
+healthy and before the backend starts.
 
 ## Environment Variables
 

@@ -3,6 +3,7 @@
 
 	import {
 		finishGame,
+		getAdminLobby,
 		getAdminGameState,
 		joinAdminGame,
 		listQuestionPacks,
@@ -13,6 +14,7 @@
 		type Lobby,
 		type QuestionPack
 	} from '$lib/api/games';
+	import { shouldRefreshAdminLobby } from '$lib/admin-lobby';
 	import LobbyRoster from '$lib/components/LobbyRoster.svelte';
 	import { parseJoinCode } from '$lib/lobby';
 	import type { FetchError } from '$lib/safe/fetch';
@@ -62,6 +64,17 @@
 		if (result.error.kind !== 'HttpError' || result.error.status !== 404) {
 			errorMessage = toMessage(result.error);
 		}
+	}
+
+	async function refreshLobby(code: number) {
+		const result = await getAdminLobby(code);
+		if (result.ok) {
+			lobby = result.value;
+			if (game === null) errorMessage = '';
+			return;
+		}
+
+		errorMessage = toMessage(result.error);
 	}
 
 	async function load() {
@@ -150,7 +163,9 @@
 	onMount(() => {
 		void load();
 		const interval = window.setInterval(() => {
-			if (adminCode !== null) void refreshState(adminCode);
+			if (adminCode === null) return;
+			void refreshState(adminCode);
+			if (shouldRefreshAdminLobby(game)) void refreshLobby(adminCode);
 		}, 2500);
 		return () => window.clearInterval(interval);
 	});

@@ -31,3 +31,13 @@ ENV BIND_ADDRESS=0.0.0.0 \
 EXPOSE 8080
 
 CMD ["jeopardy-clone"]
+
+FROM rust:1.95-bookworm AS migrator
+
+WORKDIR /app
+
+RUN cargo install sqlx-cli --version 0.8.6 --no-default-features --features rustls,postgres
+
+COPY migrations ./migrations
+
+ENTRYPOINT ["sqlx", "migrate", "run", "--source", "/app/migrations"]
