@@ -37,7 +37,7 @@ services:
       RUST_LOG: debug
       BIND_ADDRESS: 0.0.0.0
       BIND_PORT: 8080
-      FRONTEND_ORIGIN: https://thecalhouns.us
+      FRONTEND_ORIGIN: http://localhost:5173
     command: cargo watch -x run
     depends_on:
       - database
@@ -52,7 +52,7 @@ services:
       - ./frontend:/app
       - frontend-node-modules:/app/node_modules
     environment:
-      PUBLIC_API_URL: http://api.thecalhouns.us
+      PUBLIC_API_URL: http://localhost:8080
     command: npm run dev -- --host 0.0.0.0
     depends_on:
       - backend

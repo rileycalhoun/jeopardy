@@ -56,7 +56,7 @@
 		const result = await getAdminGameState(code);
 		if (result.ok) {
 			game = result.value.game;
-			selectedPlayerId = game.players[0]?.id ?? null;
+			syncSelectedPlayer(game);
 			errorMessage = '';
 			return;
 		}
@@ -131,7 +131,7 @@
 		const result = await selectClue(adminCode, adminToken, categoryIndex, clueIndex);
 		if (result.ok) {
 			game = result.value.game;
-			selectedPlayerId = game.players[0]?.id ?? null;
+			syncSelectedPlayer(game);
 			errorMessage = '';
 			return;
 		}
@@ -147,6 +147,14 @@
 			return;
 		}
 		errorMessage = toMessage(result.error);
+	}
+
+	function syncSelectedPlayer(nextGame: GameView) {
+		const selectedPlayerStillExists =
+			selectedPlayerId !== null && nextGame.players.some((player) => player.id == selectedPlayerId);
+		if (selectedPlayerStillExists) return;
+
+		selectedPlayerId = nextGame.players[0]?.id ?? null;
 	}
 
 	async function finish() {
@@ -173,12 +181,16 @@
 
 <div class="min-h-screen bg-slate-950 px-6 py-8 text-stone-100">
 	<div class="mx-auto flex max-w-7xl flex-col gap-6">
-		<header class="flex flex-col gap-4 border-b border-white/10 pb-5 md:flex-row md:items-end md:justify-between">
+		<header
+			class="flex flex-col gap-4 border-b border-white/10 pb-5 md:flex-row md:items-end md:justify-between"
+		>
 			<div>
 				<p class="text-sm tracking-[0.35em] text-amber-300 uppercase">Host</p>
 				<h1 class="mt-2 text-4xl font-semibold text-white">Game {params.admin_code}</h1>
 			</div>
-			<button class="rounded-md border border-white/20 px-4 py-2 text-sm" onclick={finish}>Finish game</button>
+			<button class="rounded-md border border-white/20 px-4 py-2 text-sm" onclick={finish}
+				>Finish game</button
+			>
 		</header>
 
 		{#if isLoading}
@@ -195,7 +207,10 @@
 					<div class="rounded-md border border-white/10 bg-white/5 p-5">
 						<h2 class="text-xl font-semibold">Start game</h2>
 						<div class="mt-4 flex flex-col gap-3 sm:flex-row">
-							<select bind:value={selectedPackId} class="rounded-md border border-white/10 bg-slate-900 px-3 py-2 text-white">
+							<select
+								bind:value={selectedPackId}
+								class="rounded-md border border-white/10 bg-slate-900 px-3 py-2 text-white"
+							>
 								{#each packs as pack}
 									<option value={pack.id}>{pack.title}</option>
 								{/each}
@@ -222,10 +237,17 @@
 			{:else}
 				<section class="grid gap-6 lg:grid-cols-[1fr_20rem]">
 					<div class="overflow-x-auto">
-						<div class="grid min-w-[720px] gap-2" style={`grid-template-columns: repeat(${game.board[game.current_round]?.categories.length ?? 1}, minmax(0, 1fr));`}>
+						<div
+							class="grid min-w-[720px] gap-2"
+							style={`grid-template-columns: repeat(${game.board[game.current_round]?.categories.length ?? 1}, minmax(0, 1fr));`}
+						>
 							{#each game.board[game.current_round]?.categories ?? [] as category, categoryIndex}
 								<div class="grid gap-2">
-									<div class="flex min-h-20 items-center justify-center rounded-md bg-blue-900 p-3 text-center font-semibold uppercase">{category.title}</div>
+									<div
+										class="flex min-h-20 items-center justify-center rounded-md bg-blue-900 p-3 text-center font-semibold uppercase"
+									>
+										{category.title}
+									</div>
 									{#each category.clues as clue, clueIndex}
 										<button
 											class="min-h-20 rounded-md border border-blue-300/20 bg-blue-800 p-3 text-2xl font-bold text-amber-200 disabled:bg-slate-800 disabled:text-slate-500"
@@ -262,17 +284,28 @@
 
 				{#if game.active_clue}
 					<section class="rounded-md border border-amber-300/25 bg-slate-900 p-5">
-						<p class="text-sm text-amber-200">{game.active_clue.label} · {game.active_clue.value}</p>
+						<p class="text-sm text-amber-200">
+							{game.active_clue.label} · {game.active_clue.value}
+						</p>
 						<h2 class="mt-2 text-2xl font-semibold">{game.active_clue.question}</h2>
 						<p class="mt-3 text-slate-300">Answer: {game.active_clue.answer}</p>
 						<div class="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
-							<select bind:value={selectedPlayerId} class="rounded-md border border-white/10 bg-slate-950 px-3 py-2 text-white">
+							<select
+								bind:value={selectedPlayerId}
+								class="rounded-md border border-white/10 bg-slate-950 px-3 py-2 text-white"
+							>
 								{#each game.players as player}
 									<option value={player.id}>{player.name}</option>
 								{/each}
 							</select>
-							<button class="rounded-md bg-emerald-300 px-4 py-2 font-semibold text-slate-950" onclick={() => markAnswer(true)}>Correct</button>
-							<button class="rounded-md bg-rose-300 px-4 py-2 font-semibold text-slate-950" onclick={() => markAnswer(false)}>Incorrect</button>
+							<button
+								class="rounded-md bg-emerald-300 px-4 py-2 font-semibold text-slate-950"
+								onclick={() => markAnswer(true)}>Correct</button
+							>
+							<button
+								class="rounded-md bg-rose-300 px-4 py-2 font-semibold text-slate-950"
+								onclick={() => markAnswer(false)}>Incorrect</button
+							>
 						</div>
 						{#if game.active_clue.submissions.length > 0}
 							<div class="mt-5">
@@ -284,14 +317,18 @@
 											data-selected={selectedPlayerId === submission.player_id}
 											onclick={() => (selectedPlayerId = submission.player_id)}
 										>
-											<span class="block text-sm font-semibold text-amber-200">{submission.player_name}</span>
+											<span class="block text-sm font-semibold text-amber-200"
+												>{submission.player_name}</span
+											>
 											<span class="mt-2 block text-lg text-white">{submission.answer}</span>
 										</button>
 									{/each}
 								</div>
 							</div>
 						{:else}
-							<div class="mt-5 rounded-md border border-white/10 bg-slate-950 p-4 text-sm text-slate-300">
+							<div
+								class="mt-5 rounded-md border border-white/10 bg-slate-950 p-4 text-sm text-slate-300"
+							>
 								Submitted answers will appear here as cards.
 							</div>
 						{/if}
