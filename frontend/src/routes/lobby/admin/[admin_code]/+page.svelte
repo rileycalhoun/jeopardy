@@ -123,6 +123,7 @@
 			errorMessage = '';
 			return;
 		}
+
 		errorMessage = toMessage(result.error);
 	}
 

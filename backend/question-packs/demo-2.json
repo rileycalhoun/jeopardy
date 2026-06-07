@@ -1,0 +1,191 @@
+{
+  "id": "ultimate-pop-culture-challenge",
+  "title": "Ultimate Pop Culture Challenge",
+  "rounds": [
+    {
+      "name": "Jeopardy",
+      "categories": [
+        {
+          "title": "90s/2000s Cartoons",
+          "clues": [
+            {
+              "label": "$200",
+              "question": "This cartoon's episode 'The Mask' features a character who can transform objects into gold, referencing the mythological figure Midas.",
+              "answer": "What is Animaniacs?",
+              "value": 200
+            },
+            {
+              "label": "$400",
+              "question": "In this show, the character 'Numbuh 362' is revealed to be the youngest member of the Kids Next Door organization.",
+              "answer": "What is Codename: Kids Next Door?",
+              "value": 400
+            },
+            {
+              "label": "$600",
+              "question": "This cartoon's character 'Courage' is named after the emotion he most frequently experiences, and his original design included a pink nose.",
+              "answer": "What is Courage the Cowardly Dog?",
+              "value": 600
+            },
+            {
+              "label": "$800",
+              "question": "In this show, the character 'The Grim Reaper' is humorously depicted as a bumbling, cowardly figure who fears the protagonist.",
+              "answer": "What is The Grim Adventures of Billy & Mandy?",
+              "value": 800
+            },
+            {
+              "label": "$1000",
+              "question": "This cartoon's episode 'The Camping Episode' features a parody of the film 'The Blair Witch Project,' complete with found footage-style animation.",
+              "answer": "What is SpongeBob SquarePants?",
+              "value": 1000
+            }
+          ]
+        },
+        {
+          "title": "Books",
+          "clues": [
+            {
+              "label": "$200",
+              "question": "This novel by Haruki Murakami features a character named Toru Okada who searches for his missing wife and encounters a mysterious woman named Nutmeg.",
+              "answer": "What is The Wind-Up Bird Chronicle?",
+              "value": 200
+            },
+            {
+              "label": "$400",
+              "question": "In this dystopian novel by Kazuo Ishiguro, the protagonist Kathy is a 'carer' who recalls her past as a 'donor' in a society where cloning is used for organ harvesting.",
+              "answer": "What is Never Let Me Go?",
+              "value": 400
+            },
+            {
+              "label": "$600",
+              "question": "This novel by David Foster Wallace features a character named Don Gately, a former burglar and drug addict who works at a halfway house.",
+              "answer": "What is Infinite Jest?",
+              "value": 600
+            },
+            {
+              "label": "$800",
+              "question": "In this novel by Cormac McCarthy, the protagonist, known only as 'the man,' travels through a post-apocalyptic landscape with his son, aiming to reach the coast.",
+              "answer": "What is The Road?",
+              "value": 800
+            },
+            {
+              "label": "$1000",
+              "question": "This novel by Vladimir Nabokov features a protagonist named Humbert Humbert, who becomes obsessed with a 12-year-old girl named Dolores Haze.",
+              "answer": "What is Lolita?",
+              "value": 1000
+            }
+          ]
+        },
+        {
+          "title": "Music",
+          "clues": [
+            {
+              "label": "$200",
+              "question": "This band's album 'OK Computer' features a song that references a dystopian future where machines have taken over, titled 'Paranoid Android.'",
+              "answer": "Who are Radiohead?",
+              "value": 200
+            },
+            {
+              "label": "$400",
+              "question": "This artist released the album 'The Chronic,' which popularized the use of the term 'G-funk' and featured collaborations with Snoop Dogg.",
+              "answer": "Who is Dr. Dre?",
+              "value": 400
+            },
+            {
+              "label": "$600",
+              "question": "This band's song '21st Century Schizoid Man' features a saxophone solo and lyrics that critique modern society, and it appears on their debut album 'In the Court of the Crimson King.'",
+              "answer": "Who are King Crimson?",
+              "value": 600
+            },
+            {
+              "label": "$800",
+              "question": "This artist released the album 'Blue Hawaii,' which includes the song 'Can't Help Falling in Love,' and is known for his cultural impact in the 1960s.",
+              "answer": "Who is Elvis Presley?",
+              "value": 800
+            },
+            {
+              "label": "$1000",
+              "question": "This band's song 'A Quick One, While He's Away' is a nine-minute suite that includes a section titled 'I've Been Away,' and it appears on their album 'A Quick One.'",
+              "answer": "Who are The Who?",
+              "value": 1000
+            }
+          ]
+        },
+        {
+          "title": "Disney",
+          "clues": [
+            {
+              "label": "$200",
+              "question": "This Disney film features a character named 'Maui,' a demigod who possesses a magical fishhook that allows him to shapeshift.",
+              "answer": "What is Moana?",
+              "value": 200
+            },
+            {
+              "label": "$400",
+              "question": "In this Disney movie, the character 'Esmeralda' is a Romani woman who befriends the protagonist Quasimodo and challenges the villain Judge Frollo.",
+              "answer": "What is The Hunchback of Notre Dame?",
+              "value": 400
+            },
+            {
+              "label": "$600",
+              "question": "This Disney film features a character named 'Stitch,' who is an alien experiment designed to cause chaos but ultimately finds a family.",
+              "answer": "What is Lilo & Stitch?",
+              "value": 600
+            },
+            {
+              "label": "$800",
+              "question": "In this Disney movie, the character 'Merlin' is a powerful sorcerer who serves as the mentor to the protagonist, Arthur.",
+              "answer": "What is The Sword in the Stone?",
+              "value": 800
+            },
+            {
+              "label": "$1000",
+              "question": "This Disney film features a character named 'Cruella de Vil,' who is obsessed with stealing dalmatian puppies to make a fur coat.",
+              "answer": "What is 101 Dalmatians?",
+              "value": 1000
+            }
+          ]
+        },
+        {
+          "title": "Musicals",
+          "clues": [
+            {
+              "label": "$200",
+              "question": "This musical features the song 'Defying Gravity' and follows the story of Elphaba, a green-skinned woman who is ostracized for her powers.",
+              "answer": "What is Wicked?",
+              "value": 200
+            },
+            {
+              "label": "$400",
+              "question": "In this musical, the character 'Jean Valjean' is pursued by Inspector Javert after stealing a loaf of bread to feed his sister's child.",
+              "answer": "What is Les Misérables?",
+              "value": 400
+            },
+            {
+              "label": "$600",
+              "question": "This musical features the song 'Memory' and follows the life of a former show cat named Grizabella, who seeks redemption.",
+              "answer": "What is Cats?",
+              "value": 600
+            },
+            {
+              "label": "$800",
+              "question": "In this musical, the character 'Alexander Hamilton' is killed in a duel with Aaron Burr, and the story is told through hip-hop and traditional show tunes.",
+              "answer": "What is Hamilton?",
+              "value": 800
+            },
+            {
+              "label": "$1000",
+              "question": "This musical features the song 'The Phantom of the Opera' and follows the story of a disfigured musical genius who haunts the Paris Opera House.",
+              "answer": "What is The Phantom of the Opera?",
+              "value": 1000
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "final_jeopardy": {
+    "category": "Pop Culture",
+    "question": "This 1997 film features the fictional band Spinal Tap and their quest for success, including a performance at a Stonehenge-inspired venue.",
+    "answer": "What is This Is Spinal Tap?"
+  }
+}
