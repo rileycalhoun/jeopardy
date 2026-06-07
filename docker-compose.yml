@@ -41,9 +41,6 @@ services:
       BIND_PORT: 8080
       FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:3000}
       QUESTION_PACK_DIR: /app/question-packs
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
 
   frontend:
     build:
