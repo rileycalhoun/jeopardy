@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Clone, Debug, sqlx::FromRow)]
 pub struct PlayerRow {
@@ -7,7 +7,7 @@ pub struct PlayerRow {
     pub display_name: String,
 }
 
-#[derive(Serialize, Clone, Debug, sqlx::FromRow)]
+#[derive(Serialize, Deserialize, Clone, Debug, sqlx::FromRow)]
 pub struct PlayerSummary {
     pub id: i64,
     pub display_name: String,

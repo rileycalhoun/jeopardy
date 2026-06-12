@@ -1,11 +1,14 @@
+use std::sync::Arc;
+
+use redis::aio::ConnectionManager;
 use sqlx::postgres::PgPoolOptions;
 use tokio::net::TcpListener;
 use tracing::{error, info};
 use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::{
-    app::build_app, config::Config, content::loader::QuestionPackLoader,
-    sessions::manager::SessionManager, state::AppState,
+    app::build_app, config::Config, content::loader::QuestionPackLoader, realtime::hub::Hub,
+    sessions::redis_store::RedisSessionStore, state::AppState,
 };
 
 pub mod app;
@@ -18,8 +21,14 @@ pub mod games;
 pub mod http;
 pub mod moderation;
 pub mod players;
+pub mod realtime;
 pub mod sessions;
 pub mod state;
+
+fn generate_instance_id() -> String {
+    let bytes: [u8; 8] = rand::random();
+    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -61,11 +70,41 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Valid since checked above
     let pool = pool.unwrap();
-    let state = AppState {
-        pool: pool,
-        question_packs: QuestionPackLoader::new(&config.question_pack_dir),
-        sessions: SessionManager::default(),
+
+    // Redis holds active runtime sessions and the update event channel.
+    let redis_client = match redis::Client::open(config.redis_url.as_str()) {
+        Ok(client) => client,
+        Err(err) => {
+            error!("invalid redis url: {}", err);
+            return Err(err.into());
+        }
     };
+    let redis = match ConnectionManager::new(redis_client.clone()).await {
+        Ok(conn) => {
+            info!("connected to redis at {}", &config.redis_url);
+            conn
+        }
+        Err(err) => {
+            error!(
+                "could not connect to redis at {}: {}",
+                &config.redis_url, err
+            );
+            return Err(err.into());
+        }
+    };
+
+    let state = AppState {
+        pool,
+        question_packs: QuestionPackLoader::new(&config.question_pack_dir),
+        sessions: Arc::new(RedisSessionStore::new(redis.clone())),
+        redis,
+        hub: Hub::default(),
+        instance_id: generate_instance_id(),
+    };
+
+    // Rebroadcast updates from other backend instances to local websockets.
+    realtime::spawn_event_listener(state.clone(), redis_client);
+
     let handler = build_app(state, &config);
     info!(
         "listening on {}:{}",

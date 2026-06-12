@@ -14,12 +14,19 @@
 		type Lobby,
 		type QuestionPack
 	} from '$lib/api/games';
+	import { connectAdminGameSocket } from '$lib/api/realtime';
 	import { shouldRefreshAdminLobby } from '$lib/admin-lobby';
+	import ActiveCluePanel from '$lib/components/ActiveCluePanel.svelte';
+	import JeopardyBoard from '$lib/components/JeopardyBoard.svelte';
 	import LobbyRoster from '$lib/components/LobbyRoster.svelte';
+	import Scoreboard from '$lib/components/Scoreboard.svelte';
 	import { parseJoinCode } from '$lib/lobby';
 	import type { FetchError } from '$lib/safe/fetch';
+	import type { SafeWebSocket } from '$lib/safe/websocket';
 
 	let { params } = $props();
+
+	const FALLBACK_POLL_INTERVAL_MS = 5000;
 
 	let adminCode = $state<number | null>(null);
 	let lobby = $state<Lobby | null>(null);
@@ -28,9 +35,22 @@
 	let game = $state<GameView | null>(null);
 	let adminToken = $state('');
 	let errorMessage = $state('');
+	let infoMessage = $state('');
 	let isLoading = $state(true);
 	let isBusy = $state(false);
 	let selectedPlayerId = $state<number | null>(null);
+	let connectionLabel = $state('Connecting');
+
+	let socket: SafeWebSocket | null = null;
+	let fallbackInterval: number | null = null;
+
+	const currentRound = $derived(game?.board[game.current_round] ?? null);
+	const activeCategoryTitle = $derived(
+		game?.active_clue
+			? (game.board[game.active_clue.round_index]?.categories[game.active_clue.category_index]
+					?.title ?? '')
+			: ''
+	);
 
 	function tokenKey(code: number): string {
 		return `jeopardy-admin-token-${code}`;
@@ -52,11 +72,20 @@
 		}
 	}
 
+	function applyGameUpdate(view: GameView) {
+		game = view;
+		if (
+			selectedPlayerId === null ||
+			!view.players.some((player) => player.id === selectedPlayerId)
+		) {
+			selectedPlayerId = view.players[0]?.id ?? null;
+		}
+	}
+
 	async function refreshState(code: number) {
 		const result = await getAdminGameState(code);
 		if (result.ok) {
-			game = result.value.game;
-			syncSelectedPlayer(game);
+			applyGameUpdate(result.value.game);
 			errorMessage = '';
 			return;
 		}
@@ -75,6 +104,65 @@
 		}
 
 		errorMessage = toMessage(result.error);
+	}
+
+	function stopFallbackPolling() {
+		if (fallbackInterval !== null) {
+			window.clearInterval(fallbackInterval);
+			fallbackInterval = null;
+		}
+	}
+
+	// If the socket cannot recover, fall back to slow polling so the host
+	// console never goes dead.
+	function startFallbackPolling() {
+		if (fallbackInterval !== null) return;
+		fallbackInterval = window.setInterval(() => {
+			if (adminCode === null) return;
+			void refreshState(adminCode);
+			if (shouldRefreshAdminLobby(game)) void refreshLobby(adminCode);
+		}, FALLBACK_POLL_INTERVAL_MS);
+	}
+
+	function openSocket(code: number, token: string) {
+		socket = connectAdminGameSocket(code, token, {
+			onLobby: (players) => {
+				lobby = { players };
+			},
+			onGameState: (view) => {
+				applyGameUpdate(view);
+				errorMessage = '';
+			},
+			onGameFinished: () => {
+				game = null;
+				infoMessage = 'Game completed.';
+			},
+			onServerError: (message) => {
+				errorMessage =
+					message === 'invalid_admin_token' || message === 'missing_admin_token'
+						? 'Host authorization is missing or expired.'
+						: `Live connection rejected: ${message}.`;
+			},
+			onStateChange: (state) => {
+				switch (state) {
+					case 'open':
+						connectionLabel = 'Live';
+						stopFallbackPolling();
+						break;
+					case 'connecting':
+					case 'reconnecting':
+						connectionLabel = 'Reconnecting';
+						break;
+					case 'failed':
+						connectionLabel = 'Polling';
+						startFallbackPolling();
+						break;
+					case 'closed':
+						connectionLabel = 'Offline';
+						break;
+				}
+			}
+		});
 	}
 
 	async function load() {
@@ -111,6 +199,13 @@
 
 		await refreshState(parsedCode);
 		isLoading = false;
+
+		if (adminToken) {
+			openSocket(parsedCode, adminToken);
+		} else {
+			connectionLabel = 'Polling';
+			startFallbackPolling();
+		}
 	}
 
 	async function startSelectedPack() {
@@ -119,8 +214,9 @@
 		const result = await startGame(adminCode, adminToken, selectedPackId);
 		isBusy = false;
 		if (result.ok) {
-			game = result.value.game;
+			applyGameUpdate(result.value.game);
 			errorMessage = '';
+			infoMessage = '';
 			return;
 		}
 
@@ -131,8 +227,7 @@
 		if (adminCode === null || !adminToken || game?.phase !== 'RoundSelection') return;
 		const result = await selectClue(adminCode, adminToken, categoryIndex, clueIndex);
 		if (result.ok) {
-			game = result.value.game;
-			syncSelectedPlayer(game);
+			applyGameUpdate(result.value.game);
 			errorMessage = '';
 			return;
 		}
@@ -143,19 +238,11 @@
 		if (adminCode === null || !adminToken || selectedPlayerId === null) return;
 		const result = await resolveAnswer(adminCode, adminToken, selectedPlayerId, correct);
 		if (result.ok) {
-			game = result.value.game;
+			applyGameUpdate(result.value.game);
 			errorMessage = '';
 			return;
 		}
 		errorMessage = toMessage(result.error);
-	}
-
-	function syncSelectedPlayer(nextGame: GameView) {
-		const selectedPlayerStillExists =
-			selectedPlayerId !== null && nextGame.players.some((player) => player.id == selectedPlayerId);
-		if (selectedPlayerStillExists) return;
-
-		selectedPlayerId = nextGame.players[0]?.id ?? null;
 	}
 
 	async function finish() {
@@ -163,7 +250,8 @@
 		const result = await finishGame(adminCode, adminToken);
 		if (result.ok) {
 			game = null;
-			errorMessage = 'Game completed.';
+			infoMessage = 'Game completed.';
+			errorMessage = '';
 			return;
 		}
 		errorMessage = toMessage(result.error);
@@ -171,53 +259,63 @@
 
 	onMount(() => {
 		void load();
-		const interval = window.setInterval(() => {
-			if (adminCode === null) return;
-			void refreshState(adminCode);
-			if (shouldRefreshAdminLobby(game)) void refreshLobby(adminCode);
-		}, 2500);
-		return () => window.clearInterval(interval);
+		return () => {
+			socket?.close();
+			stopFallbackPolling();
+		};
 	});
 </script>
 
-<div class="min-h-screen bg-slate-950 px-6 py-8 text-stone-100">
+<div class="min-h-screen bg-board-deep px-6 py-8 text-white">
 	<div class="mx-auto flex max-w-7xl flex-col gap-6">
 		<header
-			class="flex flex-col gap-4 border-b border-white/10 pb-5 md:flex-row md:items-end md:justify-between"
+			class="flex flex-col gap-4 border-b border-gold/20 pb-5 md:flex-row md:items-end md:justify-between"
 		>
 			<div>
-				<p class="text-sm tracking-[0.35em] text-amber-300 uppercase">Host</p>
-				<h1 class="mt-2 text-4xl font-semibold text-white">Game {params.admin_code}</h1>
+				<p class="show-eyebrow">Host Console</p>
+				<h1 class="mt-2 font-display text-4xl font-bold tracking-wide text-white uppercase">
+					Game {params.admin_code}
+				</h1>
 			</div>
-			<button class="rounded-md border border-white/20 px-4 py-2 text-sm" onclick={finish}
-				>Finish game</button
-			>
+			<div class="flex items-center gap-3">
+				<span
+					class="rounded-full border border-gold/30 px-3 py-1 font-display text-xs tracking-widest text-gold-soft uppercase"
+				>
+					{connectionLabel}
+				</span>
+				<button class="show-button-outline" onclick={finish}>Finish Game</button>
+			</div>
 		</header>
 
 		{#if isLoading}
-			<p class="rounded-md border border-white/10 bg-white/5 px-4 py-3">Loading...</p>
+			<p class="show-panel">Loading...</p>
 		{:else}
 			{#if errorMessage}
-				<p class="rounded-md border border-amber-300/30 bg-amber-950/30 px-4 py-3 text-amber-100">
+				<p class="rounded-md border border-red-400/40 bg-red-950/40 px-4 py-3 text-red-100">
 					{errorMessage}
+				</p>
+			{/if}
+			{#if infoMessage}
+				<p class="rounded-md border border-gold/30 bg-gold/10 px-4 py-3 text-gold-soft">
+					{infoMessage}
 				</p>
 			{/if}
 
 			{#if game === null}
-				<section class="grid gap-6 lg:grid-cols-[1fr_22rem]">
-					<div class="rounded-md border border-white/10 bg-white/5 p-5">
-						<h2 class="text-xl font-semibold">Start game</h2>
+				<section class="grid gap-6 lg:grid-cols-[1fr_24rem]">
+					<div class="show-panel">
+						<h2 class="font-display text-xl font-bold tracking-wide uppercase">Start Game</h2>
+						<p class="mt-2 text-sm text-white/70">
+							Pick a question pack and open the board once your contestants are in.
+						</p>
 						<div class="mt-4 flex flex-col gap-3 sm:flex-row">
-							<select
-								bind:value={selectedPackId}
-								class="rounded-md border border-white/10 bg-slate-900 px-3 py-2 text-white"
-							>
-								{#each packs as pack}
+							<select bind:value={selectedPackId} class="show-input">
+								{#each packs as pack (pack.id)}
 									<option value={pack.id}>{pack.title}</option>
 								{/each}
 							</select>
 							<button
-								class="rounded-md bg-amber-300 px-4 py-2 font-semibold text-slate-950 disabled:opacity-50"
+								class="show-button-gold"
 								disabled={isBusy || !selectedPackId}
 								onclick={startSelectedPack}
 							>
@@ -236,91 +334,67 @@
 					{/if}
 				</section>
 			{:else}
-				<section class="grid gap-6 lg:grid-cols-[1fr_20rem]">
-					<div class="overflow-x-auto">
-						<div
-							class="grid min-w-[720px] gap-2"
-							style={`grid-template-columns: repeat(${game.board[game.current_round]?.categories.length ?? 1}, minmax(0, 1fr));`}
-						>
-							{#each game.board[game.current_round]?.categories ?? [] as category, categoryIndex}
-								<div class="grid gap-2">
-									<div
-										class="flex min-h-20 items-center justify-center rounded-md bg-blue-900 p-3 text-center font-semibold uppercase"
-									>
-										{category.title}
-									</div>
-									{#each category.clues as clue, clueIndex}
-										<button
-											class="min-h-20 rounded-md border border-blue-300/20 bg-blue-800 p-3 text-2xl font-bold text-amber-200 disabled:bg-slate-800 disabled:text-slate-500"
-											disabled={clue.answered || game.phase !== 'RoundSelection'}
-											onclick={() => chooseClue(categoryIndex, clueIndex)}
-										>
-											{clue.answered ? '' : clue.label}
-										</button>
-									{/each}
-								</div>
-							{/each}
-						</div>
-					</div>
+				<section class="grid gap-6 lg:grid-cols-[1fr_22rem]">
+					{#if currentRound}
+						<JeopardyBoard
+							round={currentRound}
+							interactive
+							locked={game.phase !== 'RoundSelection'}
+							onSelect={chooseClue}
+						/>
+					{/if}
 
 					<aside class="flex flex-col gap-4">
-						<div class="rounded-md border border-white/10 bg-white/5 p-4">
-							<h2 class="font-semibold">Scoreboard</h2>
-							<div class="mt-3 space-y-2">
-								{#each game.players as player}
-									<div class="flex justify-between gap-3 rounded bg-slate-900 px-3 py-2">
-										<span>{player.name}</span>
-										<span class="font-mono">{player.score}</span>
-									</div>
-								{/each}
+						<div class="show-panel">
+							<h2 class="show-eyebrow">Scores</h2>
+							<div class="mt-3">
+								<Scoreboard players={game.players} currentSelector={game.current_selector} />
 							</div>
 						</div>
 
-						<div class="rounded-md border border-white/10 bg-white/5 p-4">
-							<p class="text-sm text-slate-300">Phase</p>
-							<p class="mt-1 font-semibold">{game.phase}</p>
+						<div class="show-panel">
+							<p class="show-eyebrow">Phase</p>
+							<p class="mt-1 font-display text-lg font-bold tracking-wide uppercase">
+								{game.phase}
+							</p>
 						</div>
 					</aside>
 				</section>
 
 				{#if game.active_clue}
-					<section class="rounded-md border border-amber-300/25 bg-slate-900 p-5">
-						<p class="text-sm text-amber-200">
-							{game.active_clue.label} · {game.active_clue.value}
-						</p>
-						<h2 class="mt-2 text-2xl font-semibold">{game.active_clue.question}</h2>
-						<p class="mt-3 text-slate-300">Answer: {game.active_clue.answer}</p>
-						<div class="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
-							<select
-								bind:value={selectedPlayerId}
-								class="rounded-md border border-white/10 bg-slate-950 px-3 py-2 text-white"
-							>
-								{#each game.players as player}
+					<ActiveCluePanel clue={game.active_clue} categoryTitle={activeCategoryTitle} showAnswer>
+						<div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-center">
+							<select bind:value={selectedPlayerId} class="show-input">
+								{#each game.players as player (player.id)}
 									<option value={player.id}>{player.name}</option>
 								{/each}
 							</select>
 							<button
-								class="rounded-md bg-emerald-300 px-4 py-2 font-semibold text-slate-950"
-								onclick={() => markAnswer(true)}>Correct</button
+								class="show-button-gold bg-emerald-400 hover:bg-emerald-300"
+								onclick={() => markAnswer(true)}
 							>
+								Correct
+							</button>
 							<button
-								class="rounded-md bg-rose-300 px-4 py-2 font-semibold text-slate-950"
-								onclick={() => markAnswer(false)}>Incorrect</button
+								class="show-button-gold bg-red-400 hover:bg-red-300"
+								onclick={() => markAnswer(false)}
 							>
+								Incorrect
+							</button>
 						</div>
 						{#if game.active_clue.submissions.length > 0}
-							<div class="mt-5">
-								<h3 class="text-sm font-semibold text-slate-300">Answer Cards</h3>
+							<div class="mt-6">
+								<h3 class="show-eyebrow">Answer Cards</h3>
 								<div class="mt-3 grid gap-3 md:grid-cols-2">
-									{#each game.active_clue.submissions as submission}
+									{#each game.active_clue.submissions as submission (submission.player_id)}
 										<button
-											class="min-h-28 rounded-md border border-white/10 bg-slate-950 p-4 text-left transition hover:border-amber-300/60 data-[selected=true]:border-amber-300 data-[selected=true]:bg-amber-300/10"
+											class="min-h-28 rounded-md border border-white/10 bg-board-deep/80 p-4 text-left transition hover:border-gold/60 data-[selected=true]:border-gold data-[selected=true]:bg-gold/10"
 											data-selected={selectedPlayerId === submission.player_id}
 											onclick={() => (selectedPlayerId = submission.player_id)}
 										>
-											<span class="block text-sm font-semibold text-amber-200"
-												>{submission.player_name}</span
-											>
+											<span class="block font-display text-sm font-bold text-gold-soft uppercase">
+												{submission.player_name}
+											</span>
 											<span class="mt-2 block text-lg text-white">{submission.answer}</span>
 										</button>
 									{/each}
@@ -328,12 +402,12 @@
 							</div>
 						{:else}
 							<div
-								class="mt-5 rounded-md border border-white/10 bg-slate-950 p-4 text-sm text-slate-300"
+								class="mt-6 rounded-md border border-white/10 bg-board-deep/60 p-4 text-center text-sm text-white/60"
 							>
 								Submitted answers will appear here as cards.
 							</div>
 						{/if}
-					</section>
+					</ActiveCluePanel>
 				{/if}
 			{/if}
 		{/if}

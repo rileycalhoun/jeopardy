@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-axum = "0.8.9"
+axum = { version = "0.8.9", features = ["ws"] }
 dotenvy = "0.15.7"
 rand = "0.10.1"
 serde = { version = "1.0.228", features = ["derive"] }
@@ -21,3 +21,6 @@ sqlx = { version = "0.8", features = [
   "macros",
   "migrate"
 ] }
+redis = { version = "1.2.2", features = ["tokio-comp", "connection-manager"] }
+async-trait = "0.1.89"
+futures-util = { version = "0.3.32", default-features = false, features = ["sink", "std"] }

@@ -125,6 +125,7 @@ pub enum GameError {
     InvalidScenario(&'static str),
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct JeopardyGame {
     state: GameState,
 }

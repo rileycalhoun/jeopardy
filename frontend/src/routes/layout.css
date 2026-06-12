@@ -1,1 +1,48 @@
 @import 'tailwindcss';
+
+/*
+ * Quiz-show theme tokens. Inspired by a classic TV trivia board (royal blue
+ * tiles, gold dollar values, condensed uppercase type) without copying any
+ * protected assets.
+ */
+@theme {
+	/* The bright royal blue of board tiles. */
+	--color-board: #1426c8;
+	/* Slightly darker blue for headers and panels. */
+	--color-board-dark: #0d1a96;
+	/* Near-black navy used for page backgrounds and answered tiles. */
+	--color-board-deep: #060830;
+	/* The dark edge between tiles, like the physical board frame. */
+	--color-board-edge: #04051f;
+	/* Gold for dollar values and accents. */
+	--color-gold: #ffcc33;
+	--color-gold-soft: #ffe289;
+
+	/* Bold condensed system stack for the TV-game-show look. */
+	--font-display:
+		'Arial Narrow', 'Helvetica Neue Condensed', 'Franklin Gothic Medium', Impact, sans-serif;
+}
+
+/* Shared theme classes. Defined as plain component classes so repeated
+ * chrome (panels, buttons, inputs) stays consistent across routes. */
+@layer components {
+	.show-panel {
+		@apply rounded-xl border border-gold/20 bg-board-deep/80 p-4 shadow-lg shadow-black/40;
+	}
+
+	.show-eyebrow {
+		@apply font-display text-sm font-bold tracking-[0.35em] text-gold uppercase;
+	}
+
+	.show-button-gold {
+		@apply rounded-md bg-gold px-4 py-2 font-display font-bold tracking-wider text-board-deep uppercase shadow-md shadow-black/40 transition hover:bg-gold-soft disabled:cursor-not-allowed disabled:opacity-50;
+	}
+
+	.show-button-outline {
+		@apply rounded-md border border-gold/40 px-4 py-2 font-display font-bold tracking-wider text-gold-soft uppercase transition hover:border-gold hover:bg-gold/10 disabled:cursor-not-allowed disabled:opacity-50;
+	}
+
+	.show-input {
+		@apply rounded-md border border-white/15 bg-board-deep px-3 py-2 text-white outline-none placeholder:text-white/40 focus:border-gold/60;
+	}
+}

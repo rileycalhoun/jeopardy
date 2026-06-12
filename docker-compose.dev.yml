@@ -12,6 +12,12 @@ services:
     ports:
       - "5432:5432"
 
+  redis:
+    image: redis:8-alpine
+    restart: always
+    ports:
+      - "6379:6379"
+
   adminer:
     image: adminer:latest
     restart: always
@@ -21,6 +27,7 @@ services:
       - database
 
   backend:
+    image: jeopardy-clone-backend-dev
     build:
       context: ./backend
       dockerfile: Dockerfile.dev
@@ -34,6 +41,7 @@ services:
       - cargo-git:/usr/local/cargo/git
     environment:
       DATABASE_URL: postgres://postgres:password@database:5432/docker
+      REDIS_URL: redis://redis:6379
       RUST_LOG: debug
       BIND_ADDRESS: 0.0.0.0
       BIND_PORT: 8080
@@ -41,8 +49,10 @@ services:
     command: cargo watch -x run
     depends_on:
       - database
+      - redis
 
   frontend:
+    image: jeopardy-clone-frontend-dev
     build:
       context: ./frontend
       dockerfile: Dockerfile.dev

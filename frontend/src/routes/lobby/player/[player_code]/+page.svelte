@@ -8,11 +8,18 @@
 		type GameView,
 		type Lobby
 	} from '$lib/api/games';
+	import { connectPlayerGameSocket } from '$lib/api/realtime';
+	import ActiveCluePanel from '$lib/components/ActiveCluePanel.svelte';
+	import JeopardyBoard from '$lib/components/JeopardyBoard.svelte';
 	import LobbyRoster from '$lib/components/LobbyRoster.svelte';
+	import Scoreboard from '$lib/components/Scoreboard.svelte';
 	import { parseJoinCode } from '$lib/lobby';
 	import type { FetchError } from '$lib/safe/fetch';
+	import type { SafeWebSocket } from '$lib/safe/websocket';
 
 	let { params } = $props();
+
+	const FALLBACK_POLL_INTERVAL_MS = 5000;
 
 	let playerCode = $state<number | null>(null);
 	let lobby = $state<Lobby | null>(null);
@@ -20,13 +27,26 @@
 	let currentPlayerId = $state<number | null>(null);
 	let answerInput = $state('');
 	let answerMessage = $state('');
+	let infoMessage = $state('');
 	let lastActiveClueKey = $state<string | null>(null);
 	let errorMessage = $state('');
 	let isLoading = $state(true);
+	let connectionLabel = $state('Connecting');
+
+	let socket: SafeWebSocket | null = null;
+	let fallbackInterval: number | null = null;
+
 	let activeClueKey = $derived(
 		game?.active_clue
 			? `${game.active_clue.round_index}:${game.active_clue.category_index}:${game.active_clue.clue_index}`
 			: null
+	);
+	const currentRound = $derived(game?.board[game.current_round] ?? null);
+	const activeCategoryTitle = $derived(
+		game?.active_clue
+			? (game.board[game.active_clue.round_index]?.categories[game.active_clue.category_index]
+					?.title ?? '')
+			: ''
 	);
 
 	function toMessage(error: FetchError): string {
@@ -70,6 +90,62 @@
 		}
 	}
 
+	function stopFallbackPolling() {
+		if (fallbackInterval !== null) {
+			window.clearInterval(fallbackInterval);
+			fallbackInterval = null;
+		}
+	}
+
+	// If the socket cannot recover, fall back to slow polling so the player
+	// screen never goes dead.
+	function startFallbackPolling() {
+		if (fallbackInterval !== null) return;
+		fallbackInterval = window.setInterval(() => {
+			if (playerCode === null) return;
+			void refreshGame(playerCode);
+			if (!game) void refreshLobby(playerCode);
+		}, FALLBACK_POLL_INTERVAL_MS);
+	}
+
+	function openSocket(code: number) {
+		socket = connectPlayerGameSocket(code, {
+			onLobby: (players) => {
+				lobby = { players };
+			},
+			onGameState: (view) => {
+				game = view;
+				errorMessage = '';
+			},
+			onGameFinished: () => {
+				game = null;
+				infoMessage = 'The host finished the game. Thanks for playing!';
+			},
+			onServerError: (message) => {
+				errorMessage = `Live connection rejected: ${message}.`;
+			},
+			onStateChange: (state) => {
+				switch (state) {
+					case 'open':
+						connectionLabel = 'Live';
+						stopFallbackPolling();
+						break;
+					case 'connecting':
+					case 'reconnecting':
+						connectionLabel = 'Reconnecting';
+						break;
+					case 'failed':
+						connectionLabel = 'Polling';
+						startFallbackPolling();
+						break;
+					case 'closed':
+						connectionLabel = 'Offline';
+						break;
+				}
+			}
+		});
+	}
+
 	onMount(() => {
 		const parsedCode = parseJoinCode(params.player_code);
 		if (parsedCode === null) {
@@ -85,13 +161,12 @@
 			isLoading = false;
 		});
 
-		const interval = window.setInterval(() => {
-			if (playerCode === null) return;
-			void refreshGame(playerCode);
-			if (!game) void refreshLobby(playerCode);
-		}, 2500);
+		openSocket(parsedCode);
 
-		return () => window.clearInterval(interval);
+		return () => {
+			socket?.close();
+			stopFallbackPolling();
+		};
 	});
 
 	$effect(() => {
@@ -133,105 +208,105 @@
 	}
 </script>
 
-<div class="min-h-screen bg-slate-950 px-6 py-8 text-stone-100">
+<div class="min-h-screen bg-board-deep px-6 py-8 text-white">
 	<div class="mx-auto flex max-w-7xl flex-col gap-6">
-		<header class="border-b border-white/10 pb-5">
-			<p class="text-sm tracking-[0.35em] text-sky-300 uppercase">Player</p>
-			<h1 class="mt-2 text-4xl font-semibold text-white">Game {params.player_code}</h1>
+		<header class="flex items-end justify-between gap-4 border-b border-gold/20 pb-5">
+			<div>
+				<p class="show-eyebrow">Contestant</p>
+				<h1 class="mt-2 font-display text-4xl font-bold tracking-wide text-white uppercase">
+					Game {params.player_code}
+				</h1>
+			</div>
+			<span
+				class="rounded-full border border-gold/30 px-3 py-1 font-display text-xs tracking-widest text-gold-soft uppercase"
+			>
+				{connectionLabel}
+			</span>
 		</header>
 
 		{#if isLoading}
-			<p class="rounded-md border border-white/10 bg-white/5 px-4 py-3">Loading...</p>
+			<p class="show-panel">Loading...</p>
 		{:else if errorMessage}
-			<p class="rounded-md border border-rose-400/30 bg-rose-950/40 px-4 py-3 text-rose-100">
+			<p class="rounded-md border border-red-400/40 bg-red-950/40 px-4 py-3 text-red-100">
 				{errorMessage}
+			</p>
+		{/if}
+		{#if infoMessage}
+			<p class="rounded-md border border-gold/30 bg-gold/10 px-4 py-3 text-gold-soft">
+				{infoMessage}
 			</p>
 		{/if}
 
 		{#if game}
-			<section class="grid gap-6 lg:grid-cols-[1fr_20rem]">
-				<div class="overflow-x-auto">
-					<div class="grid min-w-[720px] gap-2" style={`grid-template-columns: repeat(${game.board[game.current_round]?.categories.length ?? 1}, minmax(0, 1fr));`}>
-						{#each game.board[game.current_round]?.categories ?? [] as category}
-							<div class="grid gap-2">
-								<div class="flex min-h-20 items-center justify-center rounded-md bg-blue-900 p-3 text-center font-semibold uppercase">{category.title}</div>
-								{#each category.clues as clue}
-									<div
-										class="flex min-h-20 items-center justify-center rounded-md border border-blue-300/20 bg-blue-800 p-3 text-2xl font-bold text-amber-200 data-[answered=true]:bg-slate-800 data-[answered=true]:text-slate-500"
-										data-answered={clue.answered}
-									>
-										{clue.answered ? '' : clue.label}
-									</div>
-								{/each}
-							</div>
-						{/each}
-					</div>
-				</div>
+			<section class="grid gap-6 lg:grid-cols-[1fr_22rem]">
+				{#if currentRound}
+					<JeopardyBoard round={currentRound} />
+				{/if}
 
 				<aside class="flex flex-col gap-4">
-					<div class="rounded-md border border-white/10 bg-white/5 p-4">
-						<h2 class="font-semibold">Scoreboard</h2>
-						<div class="mt-3 space-y-2">
-							{#each game.players as player}
-								<div class="flex justify-between gap-3 rounded bg-slate-900 px-3 py-2">
-									<span>{player.name}</span>
-									<span class="font-mono">{player.score}</span>
-								</div>
-							{/each}
+					<div class="show-panel">
+						<h2 class="show-eyebrow">Scores</h2>
+						<div class="mt-3">
+							<Scoreboard players={game.players} currentSelector={game.current_selector} />
 						</div>
 					</div>
 
-					<div class="rounded-md border border-white/10 bg-white/5 p-4">
-						<p class="text-sm text-slate-300">Status</p>
-						<p class="mt-1 font-semibold">{game.phase === 'RoundSelection' ? 'Waiting for host' : game.phase}</p>
+					<div class="show-panel">
+						<p class="show-eyebrow">Status</p>
+						<p class="mt-1 font-display text-lg font-bold tracking-wide uppercase">
+							{game.phase === 'RoundSelection' ? 'Waiting for host' : game.phase}
+						</p>
 					</div>
 
-					<div class="rounded-md border border-sky-300/25 bg-white/5 p-4">
-						<h2 class="font-semibold">Submit Answer</h2>
+					<div class="show-panel">
+						<h2 class="show-eyebrow">Submit Answer</h2>
 						{#if currentPlayerId === null}
-							<label class="mt-3 block text-sm text-slate-300" for="player-identity">Player</label>
+							<label class="mt-3 block text-sm text-white/70" for="player-identity">Player</label>
 							<select
 								id="player-identity"
-								class="mt-1 w-full rounded-md border border-white/10 bg-slate-950 px-3 py-2 text-white"
+								class="show-input mt-1 w-full"
 								onchange={(event) => choosePlayer(Number(event.currentTarget.value))}
 							>
 								<option value="">Choose your name</option>
-								{#each game.players as player}
+								{#each game.players as player (player.id)}
 									<option value={player.id}>{player.name}</option>
 								{/each}
 							</select>
 						{:else}
-							<p class="mt-2 text-sm text-slate-300">
-								Playing as {game.players.find((player) => player.id === currentPlayerId)?.name ?? 'selected player'}
+							<p class="mt-2 text-sm text-white/70">
+								Playing as {game.players.find((player) => player.id === currentPlayerId)?.name ??
+									'selected player'}
 							</p>
 						{/if}
 
 						<textarea
 							bind:value={answerInput}
-							class="mt-3 min-h-24 w-full resize-y rounded-md border border-white/10 bg-slate-950 px-3 py-2 text-white disabled:opacity-50"
+							class="show-input mt-3 min-h-24 w-full resize-y disabled:opacity-50"
 							disabled={!game.active_clue}
-							placeholder={game.active_clue ? 'Type your response' : 'Waiting for the host to select a clue'}
+							placeholder={game.active_clue
+								? 'Type your response'
+								: 'Waiting for the host to select a clue'}
 						></textarea>
 						<button
-							class="mt-3 w-full rounded-md bg-sky-300 px-4 py-2 font-semibold text-slate-950 disabled:opacity-50"
+							class="show-button-gold mt-3 w-full"
 							disabled={!game.active_clue}
 							onclick={sendAnswer}
 						>
 							Submit Answer
 						</button>
 						{#if answerMessage}
-							<p class="mt-3 text-sm text-sky-200">{answerMessage}</p>
+							<p class="mt-3 text-sm text-gold-soft">{answerMessage}</p>
 						{/if}
 					</div>
 				</aside>
 			</section>
 
 			{#if game.active_clue}
-				<section class="rounded-md border border-sky-300/25 bg-slate-900 p-5">
-					<p class="text-sm text-sky-200">{game.active_clue.label} · {game.active_clue.value}</p>
-					<h2 class="mt-2 text-2xl font-semibold">{game.active_clue.question}</h2>
-					<p class="mt-3 text-slate-300">Use the answer box beside the scoreboard to submit your response.</p>
-				</section>
+				<ActiveCluePanel clue={game.active_clue} categoryTitle={activeCategoryTitle}>
+					<p class="text-center text-sm text-white/70">
+						Use the answer box beside the scoreboard to submit your response.
+					</p>
+				</ActiveCluePanel>
 			{/if}
 		{:else if lobby}
 			<LobbyRoster

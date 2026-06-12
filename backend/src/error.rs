@@ -14,6 +14,7 @@ pub enum AppError {
     DuplicatePlayerName,
     QuestionPack(String),
     SessionNotFound,
+    SessionStorage(String),
     Gameplay(String),
     MissingAdminToken,
     InvalidAdminToken,
@@ -80,6 +81,16 @@ impl IntoResponse for AppError {
                 }),
             )
                 .into_response(),
+            AppError::SessionStorage(err) => {
+                tracing::error!("session storage error: {}", err);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(ErrorBody {
+                        error: "session_storage_error",
+                    }),
+                )
+                    .into_response()
+            }
             AppError::Gameplay(err) => {
                 tracing::warn!("gameplay error: {}", err);
                 (

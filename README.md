@@ -1,6 +1,6 @@
 # Jeopardy
 
-A work-in-progress host-controlled Jeopardy game with a Rust/Axum backend, SvelteKit frontend, and Postgres via SQLx.
+A work-in-progress host-controlled Jeopardy game with a Rust/Axum backend, SvelteKit frontend, Postgres via SQLx, and Redis for runtime game state.
 
 ## Current State
 
@@ -11,18 +11,30 @@ Implemented now:
 - Admin and player lobby pages.
 - File-backed JSON question packs in `backend/question-packs/`.
 - Backend-owned runtime gameplay sessions built from lobby players and a selected pack.
+- Runtime sessions stored in Redis, so active gameplay survives backend restarts and works across multiple backend instances.
+- WebSocket live updates for lobby and game state, with Redis pub/sub fan-out between instances and a slow-polling frontend fallback.
 - Admin token issuance on admin join; gameplay writes require `Authorization: Bearer <token>`.
 - Host-controlled clue selection and correct/incorrect scoring.
-- Player and host game-state screens using polling.
 - Postgres migrations for games, players, game status metadata, and admin tokens.
 - A pure Rust Jeopardy rules engine covering clue selection, scoring, Daily Doubles, Final Jeopardy, and completion.
 
 Still limited:
 
-- Runtime engine state is in memory only. Restarting the backend loses active gameplay sessions.
-- WebSockets are not implemented yet; frontend gameplay state uses polling.
-- Players do not buzz in or submit answers. The host controls scoring.
+- Players do not buzz in. The host controls scoring.
 - Pack authoring is JSON-only.
+
+## Storage Model
+
+PostgreSQL is the durable source of truth for long-lived records: the `games`
+table, player records, admin token hashes, game status metadata, the selected
+question pack id, and `started_at`/`completed_at` timestamps.
+
+Redis holds temporary runtime state for active games: the serialized
+`RuntimeSession` (engine state, active clue, answer submissions, current
+selector) under `jeopardy:game:{game_id}:session` with a refresh-on-write TTL,
+plus the `jeopardy:events` pub/sub channel used to broadcast game updates to
+websocket clients on every backend instance. Finishing a game removes the
+Redis session and marks the Postgres game record completed.
 
 ## Project Layout
 
@@ -49,6 +61,7 @@ Development services:
 - Backend: `http://localhost:8080`
 - Adminer: `http://localhost:8000`
 - Postgres: `localhost:5432`
+- Redis: `localhost:6379`
 
 Production Docker uses `docker-compose.yml`, builds optimized backend/frontend
 artifacts, runs database migrations, and starts the compiled Rust binary plus
@@ -64,10 +77,12 @@ Production services:
 - Backend: `http://localhost:8080`
 - Adminer: `http://localhost:8000`
 - Postgres: `localhost:5432`
+- Redis: `localhost:6379`
 
 The `postgres` Docker volume is used for database persistence.
 The production `migrate` service runs `sqlx migrate run` after Postgres becomes
-healthy and before the backend starts.
+healthy and before the backend starts. The backend also waits for the Redis
+healthcheck, since runtime sessions and update events live in Redis.
 
 ## Environment Variables
 
@@ -75,6 +90,7 @@ Backend variables:
 
 ```text
 DATABASE_URL=postgres://postgres:password@database:5432/docker
+REDIS_URL=redis://redis:6379
 BIND_ADDRESS=0.0.0.0
 BIND_PORT=8080
 FRONTEND_ORIGIN=http://localhost:3000
@@ -98,6 +114,7 @@ POSTGRES_USER=postgres
 POSTGRES_PASSWORD=<required for production>
 POSTGRES_DB=docker
 POSTGRES_PORT=5432
+REDIS_PORT=6379
 BACKEND_PORT=8080
 FRONTEND_PORT=3000
 ADMINER_PORT=8000
@@ -110,10 +127,12 @@ production, set `PUBLIC_API_URL` to the browser-visible backend URL and set
 origin checks. A reverse proxy should route public traffic to the frontend on
 port `3000` and the backend API on port `8080`.
 
-For running the backend directly from `backend/`, use a localhost database URL:
+For running the backend directly from `backend/`, use localhost database and
+Redis URLs:
 
 ```bash
-DATABASE_URL=postgres://postgres:password@127.0.0.1:5432/docker cargo run
+DATABASE_URL=postgres://postgres:password@127.0.0.1:5432/docker \
+REDIS_URL=redis://127.0.0.1:6379 cargo run
 ```
 
 The production frontend container uses `@sveltejs/adapter-node` and starts with
@@ -127,7 +146,8 @@ The production frontend container uses `@sveltejs/adapter-node` and starts with
 4. Open the admin lobby with the admin code.
 5. Choose a question pack and start the game.
 6. The host selects clues and marks a selected player correct or incorrect.
-7. Player pages poll for the same board, active clue, and scoreboard state.
+7. Player and host pages receive the board, active clue, and scoreboard state
+   live over WebSockets (with slow polling as a fallback).
 8. The host can finish the game.
 
 ## Backend API
@@ -166,6 +186,21 @@ Authorization: Bearer <admin_token>
 ```
 
 The raw admin token is returned once from `POST /games/join/admin`.
+
+WebSockets:
+
+```text
+GET /ws/games/admin/{admin_code}?token=<admin_token>
+GET /ws/games/player/{player_code}
+```
+
+Each socket sends the current lobby (and game state, if a session is active)
+on connect, then pushes tagged JSON messages (`lobby`, `game_state`,
+`game_finished`, `pong`, `error`) after every gameplay mutation. The admin
+socket validates the admin token and admins receive answers and player
+submissions; player sockets receive a redacted view. Unauthenticated sockets
+are closed with an `error` message and close code `4401`. Gameplay commands
+remain REST-only; sockets carry `{"type":"ping"}` heartbeats from clients.
 
 ## Question Pack Format
 
@@ -217,6 +252,13 @@ cargo test
 ```
 
 `cargo test` includes SQLx tests that require a reachable Postgres database and Docker/Postgres running locally.
+
+The Redis session store integration test is `#[ignore]`d by default. Run it
+against a live Redis with:
+
+```bash
+REDIS_URL=redis://127.0.0.1:6379 cargo test redis_store -- --ignored
+```
 
 Frontend checks:
 

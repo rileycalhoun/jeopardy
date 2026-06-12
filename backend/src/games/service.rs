@@ -13,7 +13,8 @@ use crate::{
         state::build_game_view,
     },
     players,
-    sessions::{manager::SessionError, runtime::RuntimeSession},
+    realtime::{self, UpdateKind},
+    sessions::{runtime::RuntimeSession, store::SessionError},
     state::AppState,
 };
 
@@ -73,6 +74,8 @@ pub(crate) async fn join_game(
             return Err(AppError::Database(err));
         }
     };
+
+    realtime::notify(state, game.id, UpdateKind::Lobby).await;
 
     Ok(LobbyResponse {
         players,
@@ -173,8 +176,10 @@ pub(crate) async fn start_game(
         .ok_or(AppError::GameNotFound)?;
     validate_admin_token(state, game.id, token).await?;
 
-    if state.sessions.state(game.id).await.is_ok() {
-        return Err(AppError::GameAlreadyStarted);
+    match state.sessions.state(game.id).await {
+        Ok(_) => return Err(AppError::GameAlreadyStarted),
+        Err(SessionError::NotFound) => {}
+        Err(err) => return Err(session_error(err)),
     }
 
     let players = players::repository::list_players_for_game(&state.pool, game.id)
@@ -201,7 +206,10 @@ pub(crate) async fn start_game(
             players,
             engine,
         ))
-        .await;
+        .await
+        .map_err(session_error)?;
+
+    realtime::notify(state, game.id, UpdateKind::State).await;
 
     game_state_by_admin_code(state, admin_code).await
 }
@@ -243,6 +251,8 @@ pub(crate) async fn submit_player_answer(
         .submit_answer(game.id, request.player_id, request.answer)
         .await
         .map_err(session_error)?;
+
+    realtime::notify(state, game.id, UpdateKind::State).await;
 
     game_state_by_game_id(state, game.id, false).await
 }
@@ -368,10 +378,19 @@ pub(crate) async fn finish_game(
     token: Option<&str>,
 ) -> Result<FinishGameResponse, AppError> {
     let game = authenticated_admin_game(state, admin_code, token).await?;
+    // Postgres keeps the durable completion record; Redis only loses the
+    // transient runtime state.
     repository::mark_game_completed(&state.pool, game.id)
         .await
         .map_err(AppError::Database)?;
-    state.sessions.remove(game.id).await;
+    state
+        .sessions
+        .remove(game.id)
+        .await
+        .map_err(session_error)?;
+
+    realtime::notify(state, game.id, UpdateKind::Finished).await;
+
     Ok(FinishGameResponse { completed: true })
 }
 
@@ -390,6 +409,9 @@ async fn apply_action(
             .await
             .map_err(AppError::Database)?;
     }
+
+    realtime::notify(state, game_id, UpdateKind::State).await;
+
     game_state_by_game_id(state, game_id, true).await
 }
 
@@ -398,21 +420,18 @@ async fn game_state_by_game_id(
     game_id: i64,
     include_answers: bool,
 ) -> Result<GameStateResponse, AppError> {
-    state
-        .sessions
-        .with_session(game_id, |session| GameStateResponse {
-            game: build_game_view(
-                session.state(),
-                session.pack(),
-                include_answers,
-                session.submissions(),
-            ),
-        })
-        .await
-        .map_err(session_error)
+    let session = state.sessions.get(game_id).await.map_err(session_error)?;
+    Ok(GameStateResponse {
+        game: build_game_view(
+            session.state(),
+            session.pack(),
+            include_answers,
+            session.submissions(),
+        ),
+    })
 }
 
-async fn authenticated_admin_game(
+pub(crate) async fn authenticated_admin_game(
     state: &AppState,
     admin_code: i32,
     token: Option<&str>,
@@ -449,5 +468,6 @@ fn session_error(err: SessionError) -> AppError {
         SessionError::NotFound => AppError::SessionNotFound,
         SessionError::Game(err) => AppError::Gameplay(format!("{err:?}")),
         SessionError::InvalidSubmission(err) => AppError::Gameplay(err),
+        SessionError::Storage(err) => AppError::SessionStorage(err),
     }
 }

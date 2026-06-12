@@ -1,5 +1,6 @@
 pub struct Config {
     pub database_url: String,
+    pub redis_url: String,
     pub bind_address: String,
     pub bind_port: u16,
     pub frontend_origin: String,
@@ -15,6 +16,7 @@ impl Config {
         Ok(Self {
             database_url: std::env::var("DATABASE_URL")
                 .unwrap_or("postgres://postgres:password@database:5432/docker".to_owned()),
+            redis_url: std::env::var("REDIS_URL").unwrap_or("redis://redis:6379".to_owned()),
             bind_address: std::env::var("BIND_ADDRESS").unwrap_or("0.0.0.0".to_owned()),
             bind_port: bind_port,
             frontend_origin: std::env::var("FRONTEND_ORIGIN")

@@ -5,7 +5,7 @@ use axum::{
 };
 use tower_http::cors::CorsLayer;
 
-use crate::{config::Config, games, state::AppState};
+use crate::{config::Config, games, realtime, state::AppState};
 
 pub fn build_app(state: AppState, config: &Config) -> Router {
     let cors = CorsLayer::new()
@@ -70,6 +70,14 @@ pub fn build_app(state: AppState, config: &Config) -> Router {
         .route(
             "/games/admin/{admin_code}/finish",
             post(games::api::finish_game),
+        )
+        .route(
+            "/ws/games/admin/{admin_code}",
+            get(realtime::ws::admin_socket),
+        )
+        .route(
+            "/ws/games/player/{player_code}",
+            get(realtime::ws::player_socket),
         )
         .layer(cors)
         .with_state(state)

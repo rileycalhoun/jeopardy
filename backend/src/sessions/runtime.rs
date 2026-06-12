@@ -1,18 +1,23 @@
 use std::time::SystemTime;
 
+use serde::{Deserialize, Serialize};
+
 use crate::{
     content::models::QuestionPack,
     domain::jeopardy::{GameAction, GameError, GameState, JeopardyGame},
     players::models::PlayerSummary,
 };
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AnswerSubmission {
     pub player_id: u32,
     pub player_name: String,
     pub answer: String,
 }
 
+/// The full runtime state of an active game. Serialized to Redis on every
+/// mutation so gameplay survives backend restarts and works across instances.
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RuntimeSession {
     pub game_id: i64,
     pub question_pack_id: String,
