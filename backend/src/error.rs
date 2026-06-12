@@ -7,6 +7,7 @@ use serde::Serialize;
 
 pub type AppResult<T> = Result<T, AppError>;
 
+#[derive(Debug)]
 pub enum AppError {
     Database(sqlx::Error),
     GameCreationExhausted,
@@ -29,106 +30,39 @@ struct ErrorBody {
 
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
-        match self {
-            AppError::Database(err) => {
-                tracing::error!("database error: {}", err);
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(ErrorBody {
-                        error: "internal_server_error",
-                    }),
-                )
-                    .into_response()
-            }
-            AppError::GameCreationExhausted => {
-                tracing::error!("could not generate unique values after 10 tries");
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(ErrorBody {
-                        error: "game_creation_failed",
-                    }),
-                )
-                    .into_response()
-            }
-            AppError::GameNotFound => (
-                StatusCode::NOT_FOUND,
-                Json(ErrorBody {
-                    error: "game_not_found",
-                }),
-            )
-                .into_response(),
-            AppError::DuplicatePlayerName => (
-                StatusCode::CONFLICT,
-                Json(ErrorBody {
-                    error: "duplicate_player_name",
-                }),
-            )
-                .into_response(),
-            AppError::QuestionPack(err) => {
-                tracing::warn!("question pack error: {}", err);
-                (
-                    StatusCode::BAD_REQUEST,
-                    Json(ErrorBody {
-                        error: "question_pack_error",
-                    }),
-                )
-                    .into_response()
-            }
-            AppError::SessionNotFound => (
-                StatusCode::NOT_FOUND,
-                Json(ErrorBody {
-                    error: "game_session_not_found",
-                }),
-            )
-                .into_response(),
-            AppError::SessionStorage(err) => {
-                tracing::error!("session storage error: {}", err);
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(ErrorBody {
-                        error: "session_storage_error",
-                    }),
-                )
-                    .into_response()
-            }
-            AppError::Gameplay(err) => {
-                tracing::warn!("gameplay error: {}", err);
-                (
-                    StatusCode::BAD_REQUEST,
-                    Json(ErrorBody {
-                        error: "invalid_game_action",
-                    }),
-                )
-                    .into_response()
-            }
-            AppError::MissingAdminToken => (
-                StatusCode::UNAUTHORIZED,
-                Json(ErrorBody {
-                    error: "missing_admin_token",
-                }),
-            )
-                .into_response(),
-            AppError::InvalidAdminToken => (
-                StatusCode::UNAUTHORIZED,
-                Json(ErrorBody {
-                    error: "invalid_admin_token",
-                }),
-            )
-                .into_response(),
-            AppError::WrongGameForToken => (
-                StatusCode::FORBIDDEN,
-                Json(ErrorBody {
-                    error: "wrong_game_for_token",
-                }),
-            )
-                .into_response(),
-            AppError::GameAlreadyStarted => (
-                StatusCode::CONFLICT,
-                Json(ErrorBody {
-                    error: "game_already_started",
-                }),
-            )
-                .into_response(),
+        let (status, code, unexpected) = match &self {
+            AppError::Database(_) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "internal_server_error",
+                true,
+            ),
+            AppError::GameCreationExhausted => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "game_creation_failed",
+                true,
+            ),
+            AppError::GameNotFound => (StatusCode::NOT_FOUND, "game_not_found", false),
+            AppError::DuplicatePlayerName => (StatusCode::CONFLICT, "duplicate_player_name", false),
+            AppError::QuestionPack(_) => (StatusCode::BAD_REQUEST, "question_pack_error", false),
+            AppError::SessionNotFound => (StatusCode::NOT_FOUND, "game_session_not_found", false),
+            AppError::SessionStorage(_) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "session_storage_error",
+                true,
+            ),
+            AppError::Gameplay(_) => (StatusCode::BAD_REQUEST, "invalid_game_action", false),
+            AppError::MissingAdminToken => (StatusCode::UNAUTHORIZED, "missing_admin_token", false),
+            AppError::InvalidAdminToken => (StatusCode::UNAUTHORIZED, "invalid_admin_token", false),
+            AppError::WrongGameForToken => (StatusCode::FORBIDDEN, "wrong_game_for_token", false),
+            AppError::GameAlreadyStarted => (StatusCode::CONFLICT, "game_already_started", false),
+        };
+
+        if unexpected {
+            tracing::error!(error_code = code, error = ?self, "request failed");
+        } else {
+            tracing::warn!(error_code = code, error = ?self, "request rejected");
         }
+
+        (status, Json(ErrorBody { error: code })).into_response()
     }
 }

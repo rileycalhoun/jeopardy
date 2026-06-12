@@ -49,14 +49,14 @@ pub async fn notify(state: &AppState, game_id: i64, kind: UpdateKind) {
     let payload = match serde_json::to_string(&envelope) {
         Ok(payload) => payload,
         Err(err) => {
-            warn!(game_id, "could not encode update event: {err}");
+            warn!(game_id, ?err, "could not encode update event");
             return;
         }
     };
 
     let mut conn = state.redis.clone();
     if let Err(err) = conn.publish::<_, _, ()>(EVENTS_CHANNEL, payload).await {
-        warn!(game_id, "could not publish update event to redis: {err}");
+        warn!(game_id, ?err, "could not publish update event to redis");
     }
 }
 
@@ -69,7 +69,7 @@ async fn broadcast_to_local_clients(state: &AppState, game_id: i64, kind: Update
             match players::repository::list_players_for_game(&state.pool, game_id).await {
                 Ok(players) => update.lobby = Some(players),
                 Err(err) => {
-                    warn!(game_id, "could not load lobby for broadcast: {err}");
+                    warn!(game_id, ?err, "could not load lobby for broadcast");
                     return;
                 }
             }
@@ -103,12 +103,13 @@ async fn broadcast_to_local_clients(state: &AppState, game_id: i64, kind: Update
 /// Subscribe to the Redis events channel and rebroadcast updates that
 /// originated on other backend instances. Reconnects with a fixed delay.
 pub fn spawn_event_listener(state: AppState, client: redis::Client) {
+    info!(channel = EVENTS_CHANNEL, "starting redis pubsub listener");
     tokio::spawn(async move {
         loop {
             match client.get_async_pubsub().await {
                 Ok(mut pubsub) => {
                     if let Err(err) = pubsub.subscribe(EVENTS_CHANNEL).await {
-                        warn!("could not subscribe to redis events channel: {err}");
+                        warn!(?err, "could not subscribe to redis events channel");
                     } else {
                         info!(
                             channel = EVENTS_CHANNEL,
@@ -119,14 +120,14 @@ pub fn spawn_event_listener(state: AppState, client: redis::Client) {
                             let payload: String = match message.get_payload() {
                                 Ok(payload) => payload,
                                 Err(err) => {
-                                    warn!("could not read update event payload: {err}");
+                                    warn!(?err, "could not read update event payload");
                                     continue;
                                 }
                             };
                             let envelope: EventEnvelope = match serde_json::from_str(&payload) {
                                 Ok(envelope) => envelope,
                                 Err(err) => {
-                                    warn!("could not decode update event: {err}");
+                                    warn!(?err, "could not decode update event");
                                     continue;
                                 }
                             };
@@ -145,7 +146,7 @@ pub fn spawn_event_listener(state: AppState, client: redis::Client) {
                         warn!("redis pubsub stream ended; reconnecting");
                     }
                 }
-                Err(err) => warn!("could not open redis pubsub connection: {err}"),
+                Err(err) => warn!(?err, "could not open redis pubsub connection"),
             }
 
             tokio::time::sleep(Duration::from_secs(5)).await;

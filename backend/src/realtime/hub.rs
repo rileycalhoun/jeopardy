@@ -48,7 +48,7 @@ impl Hub {
             Ok(receivers) => debug!(game_id, receivers, "broadcast game update"),
             Err(err) => {
                 // All receivers disconnected since the channel was created.
-                warn!(game_id, "broadcast failed, pruning channel: {err}");
+                warn!(game_id, ?err, "broadcast failed, pruning channel");
                 channels.remove(&game_id);
             }
         }

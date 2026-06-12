@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use redis::{AsyncCommands, aio::ConnectionManager};
-use tracing::{debug, warn};
+use tracing::debug;
 
 use crate::sessions::{
     runtime::RuntimeSession,
@@ -21,7 +21,6 @@ impl RedisSessionStore {
     }
 
     fn storage_error(context: &str, err: impl std::fmt::Display) -> SessionError {
-        warn!("redis session store {context} failed: {err}");
         SessionError::Storage(format!("{context}: {err}"))
     }
 }

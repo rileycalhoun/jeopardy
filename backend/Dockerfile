@@ -26,7 +26,8 @@ COPY --from=builder /app/migrations ./migrations
 ENV BIND_ADDRESS=0.0.0.0 \
     BIND_PORT=8080 \
     QUESTION_PACK_DIR=/app/question-packs \
-    RUST_LOG=info
+    RUST_LOG=info \
+    LOG_FORMAT=json
 
 EXPOSE 8080
 
@@ -36,8 +37,16 @@ FROM rust:1.95-bookworm AS migrator
 
 WORKDIR /app
 
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    openssl \
+    postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN cargo install sqlx-cli --version 0.8.6 --no-default-features --features rustls,postgres
 
 COPY migrations ./migrations
+COPY docker/migrate-entrypoint.sh /usr/local/bin/migrate-entrypoint
 
-ENTRYPOINT ["sqlx", "migrate", "run", "--source", "/app/migrations"]
+RUN chmod +x /usr/local/bin/migrate-entrypoint
+
+ENTRYPOINT ["migrate-entrypoint"]

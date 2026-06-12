@@ -17,6 +17,7 @@ use crate::{
     sessions::{runtime::RuntimeSession, store::SessionError},
     state::AppState,
 };
+use tracing::info;
 
 pub(crate) async fn create_new_game(state: &AppState) -> Result<GameData, AppError> {
     for _ in 0..10 {
@@ -30,7 +31,10 @@ pub(crate) async fn create_new_game(state: &AppState) -> Result<GameData, AppErr
         let player_code: i32 = codes::generate_player_code();
 
         match repository::insert_game(&state.pool, game_id, admin_code, player_code).await {
-            Ok(Some(game)) => return Ok(game),
+            Ok(Some(game)) => {
+                info!("game created");
+                return Ok(game);
+            }
             Ok(None) => continue,
             Err(err) => return Err(AppError::Database(err)),
         }
@@ -76,6 +80,12 @@ pub(crate) async fn join_game(
     };
 
     realtime::notify(state, game.id, UpdateKind::Lobby).await;
+    info!(
+        game_id = game.id,
+        player_id = joined_player.id,
+        player_count = players.len(),
+        "player joined game"
+    );
 
     Ok(LobbyResponse {
         players,
@@ -126,6 +136,7 @@ pub(crate) async fn join_game_as_admin(
     repository::insert_admin_token(&state.pool, game.id, token_hash, "admin".to_owned())
         .await
         .map_err(AppError::Database)?;
+    info!(game_id = game.id, "admin joined game");
 
     Ok(LobbyResponse {
         players,
@@ -210,6 +221,11 @@ pub(crate) async fn start_game(
         .map_err(session_error)?;
 
     realtime::notify(state, game.id, UpdateKind::State).await;
+    info!(
+        game_id = game.id,
+        question_pack_id = %pack.id,
+        "game started"
+    );
 
     game_state_by_admin_code(state, admin_code).await
 }
@@ -253,6 +269,11 @@ pub(crate) async fn submit_player_answer(
         .map_err(session_error)?;
 
     realtime::notify(state, game.id, UpdateKind::State).await;
+    info!(
+        game_id = game.id,
+        player_id = request.player_id,
+        "player answer submission received"
+    );
 
     game_state_by_game_id(state, game.id, false).await
 }
@@ -390,6 +411,7 @@ pub(crate) async fn finish_game(
         .map_err(session_error)?;
 
     realtime::notify(state, game.id, UpdateKind::Finished).await;
+    info!(game_id = game.id, "game finished");
 
     Ok(FinishGameResponse { completed: true })
 }
@@ -399,20 +421,117 @@ async fn apply_action(
     game_id: i64,
     action: GameAction,
 ) -> Result<GameStateResponse, AppError> {
+    let action_log = ActionLog::from(&action);
     let engine_state = state
         .sessions
         .apply(game_id, action)
         .await
         .map_err(session_error)?;
+    action_log.emit(game_id);
     if engine_state.phase == GamePhase::Completed {
         repository::mark_game_completed(&state.pool, game_id)
             .await
             .map_err(AppError::Database)?;
+        info!(game_id, "game completed through gameplay");
     }
 
     realtime::notify(state, game_id, UpdateKind::State).await;
 
     game_state_by_game_id(state, game_id, true).await
+}
+
+enum ActionLog {
+    ClueSelected {
+        player_id: u32,
+        category_index: usize,
+        clue_index: usize,
+    },
+    ClueResolved {
+        player_id: u32,
+        correct: bool,
+    },
+    DailyDoubleWagered {
+        player_id: u32,
+        amount: i32,
+    },
+    DailyDoubleResolved {
+        player_id: u32,
+        correct: bool,
+    },
+    FinalWagered {
+        player_id: u32,
+        amount: i32,
+    },
+    FinalResolved {
+        player_id: u32,
+        correct: bool,
+    },
+}
+
+impl From<&GameAction> for ActionLog {
+    fn from(action: &GameAction) -> Self {
+        match action {
+            GameAction::SelectClue {
+                player_id,
+                category_index,
+                clue_index,
+            } => Self::ClueSelected {
+                player_id: *player_id,
+                category_index: *category_index,
+                clue_index: *clue_index,
+            },
+            GameAction::AttemptAnswer { player_id, correct } => Self::ClueResolved {
+                player_id: *player_id,
+                correct: *correct,
+            },
+            GameAction::SubmitDailyDoubleWager { player_id, amount } => Self::DailyDoubleWagered {
+                player_id: *player_id,
+                amount: *amount,
+            },
+            GameAction::ResolveDailyDouble { player_id, correct } => Self::DailyDoubleResolved {
+                player_id: *player_id,
+                correct: *correct,
+            },
+            GameAction::SubmitFinalWager { player_id, amount } => Self::FinalWagered {
+                player_id: *player_id,
+                amount: *amount,
+            },
+            GameAction::ResolveFinalAnswer { player_id, correct } => Self::FinalResolved {
+                player_id: *player_id,
+                correct: *correct,
+            },
+        }
+    }
+}
+
+impl ActionLog {
+    fn emit(self, game_id: i64) {
+        match self {
+            Self::ClueSelected {
+                player_id,
+                category_index,
+                clue_index,
+            } => info!(
+                game_id,
+                player_id, category_index, clue_index, "clue selected"
+            ),
+            Self::ClueResolved { player_id, correct } => {
+                info!(game_id, player_id, correct, "clue answer resolved")
+            }
+            Self::DailyDoubleWagered { player_id, amount } => {
+                info!(game_id, player_id, amount, "daily double wager submitted")
+            }
+            Self::DailyDoubleResolved { player_id, correct } => {
+                info!(game_id, player_id, correct, "daily double resolved")
+            }
+            Self::FinalWagered { player_id, amount } => {
+                info!(game_id, player_id, amount, "final wager submitted")
+            }
+            Self::FinalResolved { player_id, correct } => {
+                info!(game_id, player_id, correct, "final answer resolved")
+            }
+        }
+    }
 }
 
 async fn game_state_by_game_id(

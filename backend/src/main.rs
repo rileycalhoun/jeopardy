@@ -4,7 +4,6 @@ use redis::aio::ConnectionManager;
 use sqlx::postgres::PgPoolOptions;
 use tokio::net::TcpListener;
 use tracing::{error, info};
-use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::{
     app::build_app, config::Config, content::loader::QuestionPackLoader, realtime::hub::Hub,
@@ -19,6 +18,7 @@ pub mod domain;
 pub mod error;
 pub mod games;
 pub mod http;
+pub mod logging;
 pub mod moderation;
 pub mod players;
 pub mod realtime;
@@ -32,26 +32,26 @@ fn generate_instance_id() -> String {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Loading `.env` is optional; only treat parse/load failures as fatal.
+    // Loading `.env` happens before tracing so it can configure the subscriber.
     if let Err(err) = dotenvy::dotenv() {
         if !err.not_found() {
-            eprintln!("could not load dotenv file: {}", err);
+            eprintln!("could not load dotenv file: {err}");
             return Err(err.into());
         }
     }
 
-    // Initialize logging before any other startup checks so early failures are visible.
-    tracing_subscriber::registry()
-        .with(fmt::layer())
-        .with(
-            EnvFilter::builder()
-                .with_default_directive(tracing::level_filters::LevelFilter::INFO.into())
-                .from_env_lossy(),
-        )
-        .init();
+    logging::init();
 
     let config = match Config::from_env() {
-        Ok(config) => config,
+        Ok(config) => {
+            info!(
+                bind_address = %config.bind_address,
+                bind_port = config.bind_port,
+                question_pack_dir = %config.question_pack_dir,
+                "configuration loaded"
+            );
+            config
+        }
         Err(err) => {
             error!(?err, "could not parse config");
             return Err(err.into());
@@ -63,32 +63,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .connect(&config.database_url)
         .await;
 
-    if let Err(err) = pool {
-        error!("could not connect to database");
-        return Err(err.into());
-    }
-
-    // Valid since checked above
-    let pool = pool.unwrap();
+    let pool = match pool {
+        Ok(pool) => {
+            info!("connected to database");
+            pool
+        }
+        Err(err) => {
+            error!(?err, "could not connect to database");
+            return Err(err.into());
+        }
+    };
 
     // Redis holds active runtime sessions and the update event channel.
     let redis_client = match redis::Client::open(config.redis_url.as_str()) {
         Ok(client) => client,
         Err(err) => {
-            error!("invalid redis url: {}", err);
+            error!(?err, "invalid redis URL");
             return Err(err.into());
         }
     };
     let redis = match ConnectionManager::new(redis_client.clone()).await {
         Ok(conn) => {
-            info!("connected to redis at {}", &config.redis_url);
+            info!("connected to redis");
             conn
         }
         Err(err) => {
-            error!(
-                "could not connect to redis at {}: {}",
-                &config.redis_url, err
-            );
+            error!(?err, "could not connect to redis");
             return Err(err.into());
         }
     };
@@ -107,8 +107,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let handler = build_app(state, &config);
     info!(
-        "listening on {}:{}",
-        &config.bind_address, &config.bind_port
+        bind_address = %config.bind_address,
+        bind_port = config.bind_port,
+        "starting HTTP server"
     );
 
     // Keep bind and serve errors separate so the logs show which phase failed.
@@ -116,14 +117,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Ok(listener) => match axum::serve(listener, handler).await {
             Ok(_) => Ok(()),
             Err(err) => {
-                error!("Could not serve app: {}", err);
+                error!(?err, "HTTP server failed");
                 Err(err.into())
             }
         },
         Err(err) => {
             error!(
-                "Could not bind to address {}:{}: {}",
-                &config.bind_address, &config.bind_port, err
+                ?err,
+                bind_address = %config.bind_address,
+                bind_port = config.bind_port,
+                "could not bind HTTP listener"
             );
 
             Err(err.into())

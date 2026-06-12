@@ -96,7 +96,15 @@ BIND_PORT=8080
 FRONTEND_ORIGIN=http://localhost:3000
 QUESTION_PACK_DIR=/app/question-packs
 RUST_LOG=info
+LOG_FORMAT=json
 ```
+
+`RUST_LOG` accepts standard `tracing_subscriber::EnvFilter` directives, including
+per-module levels such as `jeopardy_clone=debug,tower_http=info`. `LOG_FORMAT`
+accepts `json` for structured production logs or `pretty` for readable local
+logs. Missing values default to `info` and `pretty`; invalid values fall back
+gracefully. Logs are written to stdout/stderr for collection by Docker, Loki,
+or another container log driver.
 
 Frontend variables:
 
@@ -132,7 +140,9 @@ Redis URLs:
 
 ```bash
 DATABASE_URL=postgres://postgres:password@127.0.0.1:5432/docker \
-REDIS_URL=redis://127.0.0.1:6379 cargo run
+REDIS_URL=redis://127.0.0.1:6379 \
+RUST_LOG=debug \
+LOG_FORMAT=pretty cargo run
 ```
 
 The production frontend container uses `@sveltejs/adapter-node` and starts with

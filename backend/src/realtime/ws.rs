@@ -2,14 +2,15 @@ use std::time::Duration;
 
 use axum::{
     extract::{
-        Path, Query, State,
+        Extension, Path, Query, State,
         ws::{CloseFrame, Message, WebSocket, WebSocketUpgrade},
     },
     response::Response,
 };
 use serde::Deserialize;
 use tokio::time::Instant;
-use tracing::{debug, info, warn};
+use tower_http::request_id::RequestId;
+use tracing::{debug, error, info, warn};
 
 use crate::{
     error::AppError,
@@ -23,6 +24,7 @@ use crate::{
         hub::GameBroadcast,
         messages::{ClientMessage, ServerMessage},
     },
+    sessions::store::SessionError,
     state::AppState,
 };
 
@@ -49,8 +51,14 @@ pub async fn admin_socket(
     State(state): State<AppState>,
     Path(admin_code): Path<i32>,
     Query(query): Query<AdminSocketQuery>,
+    Extension(request_id): Extension<RequestId>,
     ws: WebSocketUpgrade,
 ) -> Response {
+    let request_id = request_id
+        .header_value()
+        .to_str()
+        .unwrap_or("<invalid>")
+        .to_owned();
     ws.on_upgrade(move |socket| async move {
         let game =
             match service::authenticated_admin_game(&state, admin_code, query.token.as_deref())
@@ -59,14 +67,18 @@ pub async fn admin_socket(
                 Ok(game) => game,
                 Err(err) => {
                     let reason = auth_error_code(&err);
-                    warn!(admin_code, reason, "rejected admin websocket");
+                    if reason == "internal_error" {
+                        error!(request_id, ?err, "rejected admin websocket");
+                    } else {
+                        warn!(request_id, reason, "rejected admin websocket");
+                    }
                     reject(socket, reason).await;
                     return;
                 }
             };
 
-        info!(admin_code, game_id = game.id, "admin websocket connected");
-        run_connection(state, socket, game.id, Audience::Admin).await;
+        info!(request_id, game_id = game.id, "admin websocket connected");
+        run_connection(state, socket, game.id, Audience::Admin, &request_id).await;
     })
 }
 
@@ -74,31 +86,35 @@ pub async fn admin_socket(
 pub async fn player_socket(
     State(state): State<AppState>,
     Path(player_code): Path<i32>,
+    Extension(request_id): Extension<RequestId>,
     ws: WebSocketUpgrade,
 ) -> Response {
+    let request_id = request_id
+        .header_value()
+        .to_str()
+        .unwrap_or("<invalid>")
+        .to_owned();
     ws.on_upgrade(move |socket| async move {
         let game = match find_game_by_player_code(&state.pool, player_code).await {
             Ok(Some(game)) => game,
             Ok(None) => {
                 warn!(
-                    player_code,
-                    "rejected player websocket: unknown player code"
+                    request_id,
+                    reason = "game_not_found",
+                    "rejected player websocket"
                 );
                 reject(socket, "game_not_found").await;
                 return;
             }
             Err(err) => {
-                warn!(
-                    player_code,
-                    "rejected player websocket: database error: {err}"
-                );
+                error!(request_id, ?err, "rejected player websocket");
                 reject(socket, "internal_error").await;
                 return;
             }
         };
 
-        info!(player_code, game_id = game.id, "player websocket connected");
-        run_connection(state, socket, game.id, Audience::Player).await;
+        info!(request_id, game_id = game.id, "player websocket connected");
+        run_connection(state, socket, game.id, Audience::Player, &request_id).await;
     })
 }
 
@@ -129,7 +145,13 @@ fn auth_error_code(err: &AppError) -> &'static str {
     }
 }
 
-async fn run_connection(state: AppState, mut socket: WebSocket, game_id: i64, audience: Audience) {
+async fn run_connection(
+    state: AppState,
+    mut socket: WebSocket,
+    game_id: i64,
+    audience: Audience,
+    request_id: &str,
+) {
     // Subscribe before the initial snapshot so updates racing the snapshot
     // are queued rather than lost.
     let mut updates = state.hub.subscribe(game_id).await;
@@ -138,7 +160,12 @@ async fn run_connection(state: AppState, mut socket: WebSocket, game_id: i64, au
         .await
         .is_err()
     {
-        warn!(game_id, ?audience, "could not send initial websocket state");
+        warn!(
+            request_id,
+            game_id,
+            ?audience,
+            "could not send initial websocket state"
+        );
         return;
     }
 
@@ -152,14 +179,14 @@ async fn run_connection(state: AppState, mut socket: WebSocket, game_id: i64, au
                 Ok(update) => {
                     for message in messages_for(&update, audience) {
                         if send_json(&mut socket, &message).await.is_err() {
-                            info!(game_id, ?audience, "websocket send failed; disconnecting");
+                            info!(request_id, game_id, ?audience, "websocket send failed; disconnecting");
                             return;
                         }
                     }
                 }
                 Err(tokio::sync::broadcast::error::RecvError::Lagged(skipped)) => {
                     // The client only needs the latest state; resync it.
-                    warn!(game_id, skipped, "websocket lagged behind broadcasts; resyncing");
+                    warn!(request_id, game_id, skipped, "websocket lagged behind broadcasts; resyncing");
                     if send_initial_state(&state, &mut socket, game_id, audience).await.is_err() {
                         return;
                     }
@@ -181,13 +208,13 @@ async fn run_connection(state: AppState, mut socket: WebSocket, game_id: i64, au
                 Some(Ok(Message::Close(_))) | None => break,
                 Some(Ok(Message::Binary(_))) => {}
                 Some(Err(err)) => {
-                    debug!(game_id, ?audience, "websocket receive error: {err}");
+                    debug!(request_id, game_id, ?audience, ?err, "websocket receive error");
                     break;
                 }
             },
             _ = heartbeat.tick() => {
                 if last_seen.elapsed() > CLIENT_TIMEOUT {
-                    info!(game_id, ?audience, "websocket timed out; disconnecting");
+                    info!(request_id, game_id, ?audience, "websocket timed out; disconnecting");
                     break;
                 }
                 if socket.send(Message::Ping(Vec::new().into())).await.is_err() {
@@ -197,7 +224,7 @@ async fn run_connection(state: AppState, mut socket: WebSocket, game_id: i64, au
         }
     }
 
-    info!(game_id, ?audience, "websocket disconnected");
+    info!(request_id, game_id, ?audience, "websocket disconnected");
 }
 
 /// Push the current lobby and (if a session exists) game state on connect.
@@ -207,9 +234,12 @@ async fn send_initial_state(
     game_id: i64,
     audience: Audience,
 ) -> Result<(), ()> {
-    if let Ok(players) = players::repository::list_players_for_game(&state.pool, game_id).await {
-        send_json(socket, &ServerMessage::Lobby { players }).await?;
-    }
+    let players = players::repository::list_players_for_game(&state.pool, game_id)
+        .await
+        .map_err(|err| {
+            error!(game_id, ?err, "could not load lobby for websocket");
+        })?;
+    send_json(socket, &ServerMessage::Lobby { players }).await?;
 
     match state.sessions.get(game_id).await {
         Ok(session) => {
@@ -222,9 +252,12 @@ async fn send_initial_state(
             );
             send_json(socket, &ServerMessage::GameState { game }).await?;
         }
+        Err(SessionError::NotFound) => {
+            debug!(game_id, "no active session for initial websocket state");
+        }
         Err(err) => {
-            // No active session is normal pre-start; only log real failures.
-            debug!(game_id, ?err, "no session for initial websocket state");
+            error!(game_id, ?err, "could not load initial websocket state");
+            return Err(());
         }
     }
 
@@ -257,7 +290,7 @@ fn messages_for(update: &GameBroadcast, audience: Audience) -> Vec<ServerMessage
 
 async fn send_json(socket: &mut WebSocket, message: &ServerMessage) -> Result<(), ()> {
     let json = serde_json::to_string(message).map_err(|err| {
-        warn!("could not encode websocket message: {err}");
+        warn!(?err, "could not encode websocket message");
     })?;
     socket
         .send(Message::Text(json.into()))
