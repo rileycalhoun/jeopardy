@@ -1,4 +1,4 @@
-use crate::domain::jeopardy::{GamePhase, GameState};
+use crate::domain::jeopardy::{GamePhase, GameState, Selector};
 
 pub fn assert_invariants(current: &GameState, previous: Option<&GameState>) -> Result<(), String> {
     assert_unique_player_ids(current)?;
@@ -26,18 +26,20 @@ fn assert_unique_player_ids(state: &GameState) -> Result<(), String> {
 }
 
 fn assert_valid_selector(state: &GameState) -> Result<(), String> {
-    if state
-        .players
-        .iter()
-        .any(|player| player.id == state.current_selector)
-    {
-        return Ok(());
+    match state.current_selector {
+        // The moderator is always a valid controller (game start, overrides,
+        // and clues nobody answered correctly).
+        Selector::Moderator => Ok(()),
+        Selector::Player(id) => {
+            if state.players.iter().any(|player| player.id == id) {
+                Ok(())
+            } else {
+                Err(format!(
+                    "current selector {id} does not match any player"
+                ))
+            }
+        }
     }
-
-    Err(format!(
-        "current selector {} does not match any player",
-        state.current_selector
-    ))
 }
 
 fn assert_phase_active_clue_alignment(state: &GameState) -> Result<(), String> {

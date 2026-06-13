@@ -1,13 +1,14 @@
 use crate::{
     content::service::build_scenario,
-    domain::jeopardy::{GameAction, GamePhase, JeopardyGame},
+    domain::jeopardy::{GameAction, GamePhase, JeopardyGame, Selector},
     error::AppError,
     games::{
         auth, codes,
         models::{
             AnswerRequest, FinishGameResponse, GameData, GameStateResponse, JoinAdminRequest,
-            JoinGameRequest, LobbyResponse, PlayerAnswerRequest, QuestionPacksResponse,
-            ResolveRequest, SelectClueRequest, StartGameRequest, WagerRequest,
+            JoinGameRequest, LobbyResponse, PlayerAnswerRequest, PlayerSelectClueRequest,
+            QuestionPacksResponse, ResolveRequest, SelectClueRequest, StartGameRequest,
+            WagerRequest,
         },
         repository::{self, find_game_by_admin_code, find_game_by_player_code},
         state::build_game_view,
@@ -284,23 +285,40 @@ pub(crate) async fn select_clue(
     token: Option<&str>,
     request: SelectClueRequest,
 ) -> Result<GameStateResponse, AppError> {
+    // The moderator picks the first clue and may always override afterwards.
     let game = authenticated_admin_game(state, admin_code, token).await?;
-    let current_selector = state
-        .sessions
-        .state(game.id)
-        .await
-        .map_err(session_error)?
-        .current_selector;
     apply_action(
         state,
         game.id,
         GameAction::SelectClue {
-            player_id: current_selector,
+            actor: Selector::Moderator,
             category_index: request.category_index,
             clue_index: request.clue_index,
         },
     )
     .await
+}
+
+pub(crate) async fn select_clue_as_player(
+    state: &AppState,
+    player_code: i32,
+    request: PlayerSelectClueRequest,
+) -> Result<GameStateResponse, AppError> {
+    let game = find_game_by_player_code(&state.pool, player_code)
+        .await
+        .map_err(AppError::Database)?
+        .ok_or(AppError::GameNotFound)?;
+    apply_action(
+        state,
+        game.id,
+        GameAction::SelectClue {
+            actor: Selector::Player(request.player_id),
+            category_index: request.category_index,
+            clue_index: request.clue_index,
+        },
+    )
+    .await
+    .map_err(turn_violation)
 }
 
 pub(crate) async fn answer_clue(
@@ -442,7 +460,7 @@ async fn apply_action(
 
 enum ActionLog {
     ClueSelected {
-        player_id: u32,
+        selector: Option<u32>,
         category_index: usize,
         clue_index: usize,
     },
@@ -472,11 +490,11 @@ impl From<&GameAction> for ActionLog {
     fn from(action: &GameAction) -> Self {
         match action {
             GameAction::SelectClue {
-                player_id,
+                actor,
                 category_index,
                 clue_index,
             } => Self::ClueSelected {
-                player_id: *player_id,
+                selector: actor.player_id(),
                 category_index: *category_index,
                 clue_index: *clue_index,
             },
@@ -508,12 +526,15 @@ impl ActionLog {
     fn emit(self, game_id: i64) {
         match self {
             Self::ClueSelected {
-                player_id,
+                selector,
                 category_index,
                 clue_index,
             } => info!(
                 game_id,
-                player_id, category_index, clue_index, "clue selected"
+                ?selector,
+                category_index,
+                clue_index,
+                "clue selected"
             ),
             Self::ClueResolved { player_id, correct } => {
                 info!(game_id, player_id, correct, "clue answer resolved")
@@ -580,6 +601,15 @@ async fn validate_admin_token(
     }
 
     Ok(())
+}
+
+/// Turn the generic gameplay rejection a contestant gets when selecting out of
+/// turn into a clear, dedicated error so the player UI can explain it.
+fn turn_violation(error: AppError) -> AppError {
+    match &error {
+        AppError::Gameplay(message) if message == "NotCurrentSelector" => AppError::NotYourTurn,
+        _ => error,
+    }
 }
 
 fn session_error(err: SessionError) -> AppError {

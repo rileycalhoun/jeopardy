@@ -3,6 +3,26 @@ use std::collections::HashSet;
 
 pub type PlayerId = u32;
 
+/// Whoever is allowed to pick the next clue. Games open with the moderator in
+/// control; after a contestant is marked correct, control moves to that player.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Selector {
+    /// The host/moderator. Always allowed to select (first clue + override).
+    Moderator,
+    /// A specific contestant who earned the right to pick the next clue.
+    Player(PlayerId),
+}
+
+impl Selector {
+    /// The contestant id when a player holds control, or `None` for the moderator.
+    pub fn player_id(self) -> Option<PlayerId> {
+        match self {
+            Selector::Moderator => None,
+            Selector::Player(id) => Some(id),
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PlayerState {
     pub id: PlayerId,
@@ -44,7 +64,6 @@ pub struct GameScenario {
     pub players: Vec<PlayerState>,
     pub rounds: Vec<RoundBoard>,
     pub final_jeopardy: Option<FinalJeopardyClue>,
-    pub starting_selector: PlayerId,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -63,9 +82,13 @@ pub struct ActiveClue {
     pub round_index: usize,
     pub category_index: usize,
     pub clue_index: usize,
-    pub selector_before_clue: PlayerId,
+    pub selector_before_clue: Selector,
     pub attempted_player_ids: Vec<PlayerId>,
     pub daily_double_wager: Option<i32>,
+    /// The contestant resolving a daily double. Equals the selector when a
+    /// player is in control, or whoever the moderator designated for a
+    /// moderator-selected daily double (e.g. the very first clue).
+    pub daily_double_player: Option<PlayerId>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -74,7 +97,7 @@ pub struct GameState {
     pub current_round: usize,
     pub players: Vec<PlayerState>,
     pub rounds: Vec<RoundBoard>,
-    pub current_selector: PlayerId,
+    pub current_selector: Selector,
     pub active_clue: Option<ActiveClue>,
     pub final_jeopardy: Option<FinalJeopardyClue>,
     pub final_reveal_order: Vec<PlayerId>,
@@ -83,7 +106,7 @@ pub struct GameState {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum GameAction {
     SelectClue {
-        player_id: PlayerId,
+        actor: Selector,
         category_index: usize,
         clue_index: usize,
     },
@@ -154,18 +177,14 @@ impl JeopardyGame {
             return Err(GameError::InvalidScenario("player ids must be unique"));
         }
 
-        if !unique_ids.contains(&scenario.starting_selector) {
-            return Err(GameError::InvalidScenario(
-                "starting selector must be a valid player",
-            ));
-        }
-
         let mut state = GameState {
             phase: GamePhase::RoundSelection,
             current_round: 0,
             players: scenario.players,
             rounds: scenario.rounds,
-            current_selector: scenario.starting_selector,
+            // Games open with the moderator choosing the first clue; control
+            // passes to a contestant once one is marked correct.
+            current_selector: Selector::Moderator,
             active_clue: None,
             final_jeopardy: scenario.final_jeopardy,
             final_reveal_order: Vec::new(),
@@ -188,10 +207,10 @@ impl JeopardyGame {
     pub fn apply(&mut self, _action: GameAction) -> Result<(), GameError> {
         match _action {
             GameAction::SelectClue {
-                player_id,
+                actor,
                 category_index,
                 clue_index,
-            } => self.select_clue(player_id, category_index, clue_index),
+            } => self.select_clue(actor, category_index, clue_index),
             GameAction::AttemptAnswer { player_id, correct } => {
                 self.attempt_answer(player_id, correct)
             }
@@ -214,7 +233,7 @@ impl JeopardyGame {
 impl JeopardyGame {
     fn select_clue(
         &mut self,
-        player_id: PlayerId,
+        actor: Selector,
         category_index: usize,
         clue_index: usize,
     ) -> Result<(), GameError> {
@@ -222,7 +241,7 @@ impl JeopardyGame {
             return Err(GameError::WrongPhase);
         }
 
-        self.ensure_selector(player_id)?;
+        self.ensure_can_select(actor)?;
         let is_daily_double = self
             .current_round_board()
             .categories
@@ -246,9 +265,10 @@ impl JeopardyGame {
             round_index: self.state.current_round,
             category_index,
             clue_index,
-            selector_before_clue: player_id,
+            selector_before_clue: self.state.current_selector,
             attempted_player_ids: Vec::new(),
             daily_double_wager: None,
+            daily_double_player: None,
         });
         self.state.phase = if is_daily_double {
             GamePhase::DailyDoubleWager
@@ -272,7 +292,7 @@ impl JeopardyGame {
         let value = self.active_clue_value()?;
         if correct {
             self.state.players[player_index].score += value;
-            self.state.current_selector = player_id;
+            self.state.current_selector = Selector::Player(player_id);
             self.mark_active_clue_answered()?;
             self.state.active_clue = None;
             self.advance_after_clue();
@@ -306,7 +326,7 @@ impl JeopardyGame {
             return Err(GameError::WrongPhase);
         }
 
-        self.ensure_selector(player_id)?;
+        self.ensure_daily_double_player(player_id)?;
         let max = self.max_daily_double_wager(player_id)?;
         if !(1..=max).contains(&amount) {
             return Err(GameError::InvalidWager {
@@ -318,6 +338,7 @@ impl JeopardyGame {
 
         if let Some(active) = &mut self.state.active_clue {
             active.daily_double_wager = Some(amount);
+            active.daily_double_player = Some(player_id);
         }
         self.state.phase = GamePhase::DailyDoubleAnswer;
         Ok(())
@@ -332,7 +353,10 @@ impl JeopardyGame {
             return Err(GameError::WrongPhase);
         }
 
-        self.ensure_selector(player_id)?;
+        // The contestant resolving must be the one who placed the wager.
+        if self.active_clue()?.daily_double_player != Some(player_id) {
+            return Err(GameError::NotCurrentSelector);
+        }
         let player_index = self.player_index(player_id)?;
         let wager = self
             .active_clue()?
@@ -522,12 +546,39 @@ impl JeopardyGame {
         Ok(())
     }
 
-    fn ensure_selector(&self, player_id: PlayerId) -> Result<(), GameError> {
-        self.player_index(player_id)?;
-        if self.state.current_selector != player_id {
-            return Err(GameError::NotCurrentSelector);
+    /// Whether `actor` may pick the next clue. The moderator may always select
+    /// (the first clue and any override); a contestant may only select when
+    /// they currently hold control.
+    fn ensure_can_select(&self, actor: Selector) -> Result<(), GameError> {
+        match actor {
+            Selector::Moderator => Ok(()),
+            Selector::Player(player_id) => {
+                self.player_index(player_id)?;
+                if self.state.current_selector == Selector::Player(player_id) {
+                    Ok(())
+                } else {
+                    Err(GameError::NotCurrentSelector)
+                }
+            }
         }
-        Ok(())
+    }
+
+    /// Whether `player_id` may wager/resolve the active daily double. When a
+    /// contestant holds control it must be that contestant; when the moderator
+    /// holds control (e.g. a daily double as the first clue) the moderator may
+    /// designate any valid contestant.
+    fn ensure_daily_double_player(&self, player_id: PlayerId) -> Result<(), GameError> {
+        self.player_index(player_id)?;
+        match self.state.current_selector {
+            Selector::Moderator => Ok(()),
+            Selector::Player(selector_id) => {
+                if selector_id == player_id {
+                    Ok(())
+                } else {
+                    Err(GameError::NotCurrentSelector)
+                }
+            }
+        }
     }
 
     fn player_index(&self, player_id: PlayerId) -> Result<usize, GameError> {

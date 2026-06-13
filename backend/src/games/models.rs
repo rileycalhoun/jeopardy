@@ -67,6 +67,13 @@ pub struct SelectClueRequest {
 }
 
 #[derive(Deserialize)]
+pub struct PlayerSelectClueRequest {
+    pub player_id: u32,
+    pub category_index: usize,
+    pub clue_index: usize,
+}
+
+#[derive(Deserialize)]
 pub struct AnswerRequest {
     pub player_id: u32,
     pub correct: bool,

@@ -75,7 +75,6 @@ pub fn build_scenario(
         });
 
     Ok(GameScenario {
-        starting_selector: scenario_players[0].id,
         players: scenario_players,
         rounds,
         final_jeopardy,
@@ -114,7 +113,7 @@ mod tests {
 
         let scenario = build_scenario(&pack, &players).expect("scenario should build");
 
-        assert_eq!(scenario.starting_selector, 42);
+        assert_eq!(scenario.players[0].id, 42);
         assert_eq!(scenario.players[0].name, "Ada");
         assert_eq!(scenario.rounds[0].categories[0].title, "Rust");
         assert_eq!(scenario.rounds[0].categories[0].clues[0].value, 200);

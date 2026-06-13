@@ -11,8 +11,8 @@ use crate::{
         models::{
             AnswerRequest, CreateGameResponse, FinishGameResponse, GameStateResponse,
             JoinAdminRequest, JoinGameRequest, LobbyResponse, PlayerAnswerRequest,
-            QuestionPacksResponse, ResolveRequest, SelectClueRequest, StartGameRequest,
-            WagerRequest,
+            PlayerSelectClueRequest, QuestionPacksResponse, ResolveRequest, SelectClueRequest,
+            StartGameRequest, WagerRequest,
         },
         service,
     },
@@ -114,6 +114,15 @@ pub async fn select_clue(
     Json(request): Json<SelectClueRequest>,
 ) -> AppResult<(StatusCode, Json<GameStateResponse>)> {
     let game = service::select_clue(&state, admin_code, bearer(&headers), request).await?;
+    Ok((StatusCode::OK, Json(game)))
+}
+
+pub async fn select_clue_as_player(
+    State(state): State<AppState>,
+    Path(player_code): Path<i32>,
+    Json(request): Json<PlayerSelectClueRequest>,
+) -> AppResult<(StatusCode, Json<GameStateResponse>)> {
+    let game = service::select_clue_as_player(&state, player_code, request).await?;
     Ok((StatusCode::OK, Json(game)))
 }
 

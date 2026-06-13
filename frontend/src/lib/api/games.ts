@@ -105,6 +105,29 @@ export function selectClue(
 	);
 }
 
+export function selectClueAsPlayer(
+	playerCode: number,
+	playerId: number,
+	categoryIndex: number,
+	clueIndex: number
+): Promise<Result<{ game: GameView }, FetchError>> {
+	return safeFetchJson(
+		`${env.PUBLIC_API_URL}/games/player/${playerCode}/select-clue`,
+		GameStateSchema,
+		{
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json'
+			},
+			body: JSON.stringify({
+				player_id: playerId,
+				category_index: categoryIndex,
+				clue_index: clueIndex
+			})
+		}
+	);
+}
+
 export function resolveAnswer(
 	adminCode: number,
 	token: string,

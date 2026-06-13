@@ -73,7 +73,9 @@ export const FinalJeopardySchema = z.object({
 export const GameViewSchema = z.object({
 	phase: z.string(),
 	current_round: z.number().int(),
-	current_selector: z.number().int(),
+	// The contestant who picks the next clue, or null when the moderator is in
+	// control (game start, or after a clue nobody answered correctly).
+	current_selector: z.number().int().nullable(),
 	players: z.array(PlayerScoreSchema),
 	board: z.array(RoundSchema),
 	active_clue: ActiveClueSchema.nullable(),

@@ -16,8 +16,9 @@
 	} from '$lib/api/games';
 	import { connectAdminGameSocket } from '$lib/api/realtime';
 	import { shouldRefreshAdminLobby } from '$lib/admin-lobby';
-	import ActiveCluePanel from '$lib/components/ActiveCluePanel.svelte';
 	import JeopardyBoard from '$lib/components/JeopardyBoard.svelte';
+	import Podium from '$lib/components/Podium.svelte';
+	import QuestionModal from '$lib/components/QuestionModal.svelte';
 	import LobbyRoster from '$lib/components/LobbyRoster.svelte';
 	import Scoreboard from '$lib/components/Scoreboard.svelte';
 	import { parseJoinCode } from '$lib/lobby';
@@ -45,6 +46,13 @@
 	let fallbackInterval: number | null = null;
 
 	const currentRound = $derived(game?.board[game.current_round] ?? null);
+	const isFinished = $derived(game?.phase === 'Completed');
+	// Who controls the next clue pick, shown so the host knows whose turn it is.
+	const selectorLabel = $derived.by(() => {
+		if (!game || game.current_selector === null) return 'Moderator';
+		const selectorId = game.current_selector;
+		return game.players.find((player) => player.id === selectorId)?.name ?? 'Moderator';
+	});
 	const activeCategoryTitle = $derived(
 		game?.active_clue
 			? (game.board[game.active_clue.round_index]?.categories[game.active_clue.category_index]
@@ -333,6 +341,8 @@
 						/>
 					{/if}
 				</section>
+			{:else if isFinished}
+				<Podium players={game.players} />
 			{:else}
 				<section class="grid gap-6 lg:grid-cols-[1fr_22rem]">
 					{#if currentRound}
@@ -358,11 +368,32 @@
 								{game.phase}
 							</p>
 						</div>
+
+						{#if game.phase === 'RoundSelection'}
+							<div class="show-panel">
+								<p class="show-eyebrow">Picking Next</p>
+								<p
+									class="mt-1 font-display text-lg font-bold tracking-wide text-gold-soft uppercase"
+								>
+									{selectorLabel}
+								</p>
+								<p class="mt-2 text-xs text-white/50">
+									{game.current_selector === null
+										? 'You choose the first clue. The board is yours to override anytime.'
+										: 'You can override and pick on their behalf if needed.'}
+								</p>
+							</div>
+						{/if}
 					</aside>
 				</section>
 
 				{#if game.active_clue}
-					<ActiveCluePanel clue={game.active_clue} categoryTitle={activeCategoryTitle} showAnswer>
+					<QuestionModal
+						open
+						clue={game.active_clue}
+						categoryTitle={activeCategoryTitle}
+						showAnswer
+					>
 						<div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-center">
 							<select bind:value={selectedPlayerId} class="show-input">
 								{#each game.players as player (player.id)}
@@ -407,7 +438,7 @@
 								Submitted answers will appear here as cards.
 							</div>
 						{/if}
-					</ActiveCluePanel>
+					</QuestionModal>
 				{/if}
 			{/if}
 		{/if}

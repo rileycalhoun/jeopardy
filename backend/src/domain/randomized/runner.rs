@@ -1,7 +1,7 @@
 use rand::{RngExt, SeedableRng, prelude::IndexedRandom, rngs::StdRng};
 
 use crate::domain::jeopardy::{
-    GameAction, GameError, GamePhase, GameState, JeopardyGame, PlayerId,
+    GameAction, GameError, GamePhase, GameState, JeopardyGame, PlayerId, Selector,
 };
 
 use super::{invariants::assert_invariants, scenario::generate_scenario};
@@ -134,14 +134,14 @@ fn next_selection_action(state: &GameState, rng: &mut StdRng) -> Result<PlannedA
         .ok_or_else(|| "no clue available for selection".to_owned())?;
 
     if invalid_choice {
-        let wrong_player =
-            pick_wrong_player(state, state.current_selector).unwrap_or(state.current_selector);
+        // Re-selecting an already answered clue (with the legitimate selector)
+        // should be rejected with ClueAlreadyAnswered.
         if rng.random_bool(0.5) {
             let answered = answered_clues(state);
             if let Some((answered_category, answered_clue)) = answered.choose(rng).copied() {
                 return Ok(PlannedAction {
                     action: GameAction::SelectClue {
-                        player_id: state.current_selector,
+                        actor: state.current_selector,
                         category_index: answered_category,
                         clue_index: answered_clue,
                     },
@@ -150,19 +150,23 @@ fn next_selection_action(state: &GameState, rng: &mut StdRng) -> Result<PlannedA
             }
         }
 
-        return Ok(PlannedAction {
-            action: GameAction::SelectClue {
-                player_id: wrong_player,
-                category_index,
-                clue_index,
-            },
-            intentionally_invalid: wrong_player != state.current_selector,
-        });
+        // A contestant who is not currently in control should be rejected with
+        // NotCurrentSelector.
+        if let Some(wrong_actor) = wrong_select_actor(state) {
+            return Ok(PlannedAction {
+                action: GameAction::SelectClue {
+                    actor: wrong_actor,
+                    category_index,
+                    clue_index,
+                },
+                intentionally_invalid: true,
+            });
+        }
     }
 
     Ok(PlannedAction {
         action: GameAction::SelectClue {
-            player_id: state.current_selector,
+            actor: state.current_selector,
             category_index,
             clue_index,
         },
@@ -227,29 +231,27 @@ fn next_daily_double_wager_action(
     state: &GameState,
     rng: &mut StdRng,
 ) -> Result<PlannedAction, String> {
-    let selector = state.current_selector;
-    let selector_score = state
+    let wagering = daily_double_player(state, rng);
+    let wagering_score = state
         .players
         .iter()
-        .find(|player| player.id == selector)
+        .find(|player| player.id == wagering)
         .map(|player| player.score.max(0))
-        .ok_or_else(|| "current selector must be a valid player".to_owned())?;
+        .ok_or_else(|| "daily double wager needs a valid contestant".to_owned())?;
     let round_max = unanswered_clue_values(state)
         .into_iter()
         .max()
         .unwrap_or(200);
-    let max = selector_score.max(round_max).max(1);
+    let max = wagering_score.max(round_max).max(1);
 
+    // An amount above the cap is rejected regardless of who is in control,
+    // which keeps the invalid case deterministic even when the moderator may
+    // designate any contestant for a first-clue daily double.
     if rng.random_bool(0.25) {
-        let wrong_player = pick_wrong_player(state, selector).unwrap_or(selector);
         let invalid_amount = max + rng.random_range(1..=round_max.max(1));
         return Ok(PlannedAction {
             action: GameAction::SubmitDailyDoubleWager {
-                player_id: if rng.random_bool(0.5) {
-                    wrong_player
-                } else {
-                    selector
-                },
+                player_id: wagering,
                 amount: invalid_amount,
             },
             intentionally_invalid: true,
@@ -258,7 +260,7 @@ fn next_daily_double_wager_action(
 
     Ok(PlannedAction {
         action: GameAction::SubmitDailyDoubleWager {
-            player_id: selector,
+            player_id: wagering,
             amount: rng.random_range(1..=max),
         },
         intentionally_invalid: false,
@@ -269,21 +271,27 @@ fn next_daily_double_answer_action(
     state: &GameState,
     rng: &mut StdRng,
 ) -> Result<PlannedAction, String> {
-    let selector = state.current_selector;
-    if rng.random_bool(0.15) {
-        let wrong_player = pick_wrong_player(state, selector).unwrap_or(selector);
+    // The contestant who placed the wager is the only one who may resolve it.
+    let wagering = state
+        .active_clue
+        .as_ref()
+        .and_then(|active| active.daily_double_player)
+        .ok_or_else(|| "daily double answer phase is missing the wagering contestant".to_owned())?;
+    if rng.random_bool(0.15)
+        && let Some(wrong_player) = pick_wrong_player(state, wagering)
+    {
         return Ok(PlannedAction {
             action: GameAction::ResolveDailyDouble {
                 player_id: wrong_player,
                 correct: rng.random_bool(0.45),
             },
-            intentionally_invalid: wrong_player != selector,
+            intentionally_invalid: true,
         });
     }
 
     Ok(PlannedAction {
         action: GameAction::ResolveDailyDouble {
-            player_id: selector,
+            player_id: wagering,
             correct: rng.random_bool(0.45),
         },
         intentionally_invalid: false,
@@ -360,6 +368,31 @@ fn pick_wrong_player(state: &GameState, expected: PlayerId) -> Option<PlayerId> 
         .iter()
         .find(|player| player.id != expected)
         .map(|player| player.id)
+}
+
+/// A contestant who is *not* currently allowed to select, so the engine should
+/// reject them. Returns `None` only when every player already holds control
+/// (single-player game with that player in control).
+fn wrong_select_actor(state: &GameState) -> Option<Selector> {
+    state
+        .players
+        .iter()
+        .map(|player| player.id)
+        .find(|&id| state.current_selector != Selector::Player(id))
+        .map(Selector::Player)
+}
+
+/// The contestant who wagers on a daily double: the player in control, or — when
+/// the moderator picked it (e.g. the first clue) — any designated contestant.
+fn daily_double_player(state: &GameState, rng: &mut StdRng) -> PlayerId {
+    match state.current_selector {
+        Selector::Player(id) => id,
+        Selector::Moderator => state
+            .players
+            .choose(rng)
+            .map(|player| player.id)
+            .unwrap_or_else(|| state.players[0].id),
+    }
 }
 
 fn unanswered_clues(state: &GameState) -> Vec<(usize, usize)> {

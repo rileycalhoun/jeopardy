@@ -50,13 +50,10 @@ pub fn generate_scenario(rng: &mut StdRng) -> GameScenario {
         None
     };
 
-    let starting_selector = players.choose(rng).map(|player| player.id).unwrap_or(1);
-
     GameScenario {
         players,
         rounds,
         final_jeopardy,
-        starting_selector,
     }
 }
 
@@ -95,7 +92,6 @@ pub fn tie_breaker_scenario() -> GameScenario {
             category: "Tie".to_owned(),
             clue: "Everybody ties".to_owned(),
         }),
-        starting_selector: 1,
     }
 }
 
@@ -128,7 +124,6 @@ pub fn all_zero_scores_scenario() -> GameScenario {
             category: "Zero".to_owned(),
             clue: "Zero wager edge".to_owned(),
         }),
-        starting_selector: 1,
     }
 }
 
@@ -161,7 +156,6 @@ pub fn all_negative_scores_scenario() -> GameScenario {
             category: "No Final".to_owned(),
             clue: "Nobody should qualify".to_owned(),
         }),
-        starting_selector: 1,
     }
 }
 
@@ -188,7 +182,6 @@ pub fn daily_double_max_wager_scenario() -> GameScenario {
             }],
         }],
         final_jeopardy: None,
-        starting_selector: 1,
     }
 }
 
@@ -209,7 +202,6 @@ pub fn completed_board_scenario() -> GameScenario {
             }],
         }],
         final_jeopardy: None,
-        starting_selector: 1,
     }
 }
 

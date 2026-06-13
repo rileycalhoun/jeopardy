@@ -1,4 +1,4 @@
-use crate::domain::jeopardy::{GameAction, GameError, GamePhase, JeopardyGame};
+use crate::domain::jeopardy::{GameAction, GameError, GamePhase, JeopardyGame, Selector};
 
 use super::scenario::{
     all_negative_scores_scenario, all_zero_scores_scenario, completed_board_scenario,
@@ -46,7 +46,7 @@ fn regression_tie_game_reaches_completion() {
     let mut game = JeopardyGame::new(tie_breaker_scenario()).expect("scenario should build");
 
     game.apply(GameAction::SelectClue {
-        player_id: 1,
+        actor: Selector::Moderator,
         category_index: 0,
         clue_index: 0,
     })
@@ -88,7 +88,7 @@ fn regression_daily_double_allows_the_maximum_wager() {
         JeopardyGame::new(daily_double_max_wager_scenario()).expect("scenario should build");
 
     game.apply(GameAction::SelectClue {
-        player_id: 1,
+        actor: Selector::Moderator,
         category_index: 0,
         clue_index: 0,
     })

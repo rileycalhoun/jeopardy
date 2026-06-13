@@ -4,13 +4,15 @@
 	import {
 		getPlayerGameState,
 		getPlayerLobby,
+		selectClueAsPlayer,
 		submitPlayerAnswer,
 		type GameView,
 		type Lobby
 	} from '$lib/api/games';
 	import { connectPlayerGameSocket } from '$lib/api/realtime';
-	import ActiveCluePanel from '$lib/components/ActiveCluePanel.svelte';
 	import JeopardyBoard from '$lib/components/JeopardyBoard.svelte';
+	import Podium from '$lib/components/Podium.svelte';
+	import QuestionModal from '$lib/components/QuestionModal.svelte';
 	import LobbyRoster from '$lib/components/LobbyRoster.svelte';
 	import Scoreboard from '$lib/components/Scoreboard.svelte';
 	import { parseJoinCode } from '$lib/lobby';
@@ -48,15 +50,28 @@
 					?.title ?? '')
 			: ''
 	);
+	const isFinished = $derived(game?.phase === 'Completed');
+	// Whose turn it is to pick the next clue, for prompts on this screen.
+	const selectorName = $derived.by(() => {
+		if (!game) return '';
+		if (game.current_selector === null) return 'the host';
+		const selectorId = game.current_selector;
+		return game.players.find((player) => player.id === selectorId)?.name ?? 'another player';
+	});
+	const isMyTurn = $derived(
+		game?.phase === 'RoundSelection' &&
+			currentPlayerId !== null &&
+			game?.current_selector === currentPlayerId
+	);
 
 	function toMessage(error: FetchError): string {
 		switch (error.kind) {
 			case 'NetworkError':
 				return 'Could not reach the backend.';
 			case 'HttpError':
-				return error.status === 404
-					? 'No lobby matched that player code.'
-					: `Server returned ${error.status}.`;
+				if (error.status === 404) return 'No lobby matched that player code.';
+				if (error.status === 403) return "It's not your turn to pick a clue.";
+				return `Server returned ${error.status}.`;
 			case 'JsonParseError':
 				return 'Server returned invalid JSON.';
 			case 'ValidationError':
@@ -191,12 +206,24 @@
 		const result = await submitPlayerAnswer(playerCode, currentPlayerId, answerInput);
 		if (result.ok) {
 			game = result.value.game;
+			answerInput = '';
 			answerMessage = 'Answer submitted.';
 			errorMessage = '';
 			return;
 		}
 
 		answerMessage = '';
+		errorMessage = toMessage(result.error);
+	}
+
+	async function chooseClue(categoryIndex: number, clueIndex: number) {
+		if (playerCode === null || currentPlayerId === null || game?.phase !== 'RoundSelection') return;
+		const result = await selectClueAsPlayer(playerCode, currentPlayerId, categoryIndex, clueIndex);
+		if (result.ok) {
+			game = result.value.game;
+			errorMessage = '';
+			return;
+		}
 		errorMessage = toMessage(result.error);
 	}
 
@@ -238,33 +265,96 @@
 		{/if}
 
 		{#if game}
-			<section class="grid gap-6 lg:grid-cols-[1fr_22rem]">
-				{#if currentRound}
-					<JeopardyBoard round={currentRound} />
+			{#if isFinished}
+				<Podium players={game.players} />
+			{:else}
+				{#if isMyTurn}
+					<p
+						class="rounded-md border border-gold/50 bg-gold/15 px-4 py-3 text-center font-display font-bold tracking-wide text-gold-soft uppercase"
+					>
+						Your turn — pick a clue from the board!
+					</p>
 				{/if}
 
-				<aside class="flex flex-col gap-4">
-					<div class="show-panel">
-						<h2 class="show-eyebrow">Scores</h2>
-						<div class="mt-3">
-							<Scoreboard players={game.players} currentSelector={game.current_selector} />
+				<section class="grid gap-6 lg:grid-cols-[1fr_22rem]">
+					{#if currentRound}
+						<JeopardyBoard
+							round={currentRound}
+							interactive={isMyTurn}
+							locked={game.phase !== 'RoundSelection'}
+							onSelect={chooseClue}
+						/>
+					{/if}
+
+					<aside class="flex flex-col gap-4">
+						<div class="show-panel">
+							<h2 class="show-eyebrow">Scores</h2>
+							<div class="mt-3">
+								<Scoreboard players={game.players} currentSelector={game.current_selector} />
+							</div>
 						</div>
-					</div>
 
-					<div class="show-panel">
-						<p class="show-eyebrow">Status</p>
-						<p class="mt-1 font-display text-lg font-bold tracking-wide uppercase">
-							{game.phase === 'RoundSelection' ? 'Waiting for host' : game.phase}
-						</p>
-					</div>
+						<div class="show-panel">
+							<p class="show-eyebrow">Status</p>
+							<p class="mt-1 font-display text-lg font-bold tracking-wide uppercase">
+								{#if game.phase === 'RoundSelection'}
+									{isMyTurn ? 'Your pick' : `${selectorName} picks`}
+								{:else}
+									{game.phase}
+								{/if}
+							</p>
+						</div>
 
-					<div class="show-panel">
-						<h2 class="show-eyebrow">Submit Answer</h2>
+						<div class="show-panel">
+							<h2 class="show-eyebrow">You</h2>
+							{#if currentPlayerId === null}
+								<label class="mt-3 block text-sm text-white/70" for="player-identity">Player</label>
+								<select
+									id="player-identity"
+									class="show-input mt-1 w-full"
+									onchange={(event) => choosePlayer(Number(event.currentTarget.value))}
+								>
+									<option value="">Choose your name</option>
+									{#each game.players as player (player.id)}
+										<option value={player.id}>{player.name}</option>
+									{/each}
+								</select>
+							{:else}
+								<p class="mt-2 text-sm text-white/70">
+									Playing as {game.players.find((player) => player.id === currentPlayerId)?.name ??
+										'selected player'}
+								</p>
+							{/if}
+							<p class="mt-3 text-sm text-white/60">
+								{#if game.active_clue}
+									Answer the clue in the popup.
+								{:else if isMyTurn}
+									It's your turn — choose a clue from the board.
+								{:else}
+									Waiting for {selectorName} to pick a clue.
+								{/if}
+							</p>
+						</div>
+					</aside>
+				</section>
+			{/if}
+
+			{#if game.active_clue && !isFinished}
+				<QuestionModal open clue={game.active_clue} categoryTitle={activeCategoryTitle}>
+					<form
+						class="mx-auto flex w-full max-w-xl flex-col gap-3"
+						onsubmit={(event) => {
+							event.preventDefault();
+							void sendAnswer();
+						}}
+					>
 						{#if currentPlayerId === null}
-							<label class="mt-3 block text-sm text-white/70" for="player-identity">Player</label>
+							<label class="text-sm text-white/70" for="modal-player-identity">
+								Choose your name to answer
+							</label>
 							<select
-								id="player-identity"
-								class="show-input mt-1 w-full"
+								id="modal-player-identity"
+								class="show-input w-full"
 								onchange={(event) => choosePlayer(Number(event.currentTarget.value))}
 							>
 								<option value="">Choose your name</option>
@@ -272,41 +362,23 @@
 									<option value={player.id}>{player.name}</option>
 								{/each}
 							</select>
-						{:else}
-							<p class="mt-2 text-sm text-white/70">
-								Playing as {game.players.find((player) => player.id === currentPlayerId)?.name ??
-									'selected player'}
-							</p>
 						{/if}
 
-						<textarea
+						<label class="show-eyebrow" for="answer-input">Your Response</label>
+						<input
+							id="answer-input"
+							data-autofocus
 							bind:value={answerInput}
-							class="show-input mt-3 min-h-24 w-full resize-y disabled:opacity-50"
-							disabled={!game.active_clue}
-							placeholder={game.active_clue
-								? 'Type your response'
-								: 'Waiting for the host to select a clue'}
-						></textarea>
-						<button
-							class="show-button-gold mt-3 w-full"
-							disabled={!game.active_clue}
-							onclick={sendAnswer}
-						>
-							Submit Answer
-						</button>
+							class="show-input w-full text-center text-lg sm:text-xl"
+							autocomplete="off"
+							placeholder="Type your response"
+						/>
+						<button class="show-button-gold w-full text-lg" type="submit">Submit Answer</button>
 						{#if answerMessage}
-							<p class="mt-3 text-sm text-gold-soft">{answerMessage}</p>
+							<p class="text-center text-sm text-gold-soft">{answerMessage}</p>
 						{/if}
-					</div>
-				</aside>
-			</section>
-
-			{#if game.active_clue}
-				<ActiveCluePanel clue={game.active_clue} categoryTitle={activeCategoryTitle}>
-					<p class="text-center text-sm text-white/70">
-						Use the answer box beside the scoreboard to submit your response.
-					</p>
-				</ActiveCluePanel>
+					</form>
+				</QuestionModal>
 			{/if}
 		{:else if lobby}
 			<LobbyRoster

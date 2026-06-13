@@ -107,6 +107,10 @@ pub fn build_app(state: AppState, config: &Config) -> Router {
             post(games::api::submit_player_answer),
         )
         .route(
+            "/games/player/{player_code}/select-clue",
+            post(games::api::select_clue_as_player),
+        )
+        .route(
             "/games/admin/{admin_code}/select-clue",
             post(games::api::select_clue),
         )

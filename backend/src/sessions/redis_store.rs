@@ -109,7 +109,6 @@ mod tests {
                 }],
             }],
             final_jeopardy: None,
-            starting_selector: 7,
         })
         .expect("scenario should be valid");
 

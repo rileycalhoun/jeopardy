@@ -10,7 +10,9 @@ use crate::{
 pub struct GameView {
     pub phase: GamePhase,
     pub current_round: usize,
-    pub current_selector: u32,
+    /// The contestant who picks the next clue, or `None` when the moderator is
+    /// in control (game start or after a clue nobody answered correctly).
+    pub current_selector: Option<u32>,
     pub players: Vec<PlayerScoreView>,
     pub board: Vec<RoundView>,
     pub active_clue: Option<ActiveClueView>,
@@ -115,7 +117,7 @@ pub fn build_game_view(
     GameView {
         phase: state.phase.clone(),
         current_round: state.current_round,
-        current_selector: state.current_selector,
+        current_selector: state.current_selector.player_id(),
         players,
         board,
         active_clue: state
