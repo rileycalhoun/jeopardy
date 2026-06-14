@@ -159,7 +159,7 @@ fn a_player_cannot_select_when_it_is_not_their_turn() {
 }
 
 #[test]
-fn the_moderator_can_always_override_the_selection() {
+fn the_moderator_cannot_select_during_a_players_turn() {
     let mut game = JeopardyGame::new(scenario_with_two_clues()).expect("scenario should build");
 
     game.apply(GameAction::SelectClue {
@@ -174,14 +174,15 @@ fn the_moderator_can_always_override_the_selection() {
     })
     .expect("player one should win control");
 
-    // Player one holds control, but the moderator may still step in.
-    game.apply(GameAction::SelectClue {
+    let snapshot = game.state().clone();
+    let result = game.apply(GameAction::SelectClue {
         actor: Selector::Moderator,
         category_index: 0,
         clue_index: 1,
-    })
-    .expect("moderator override should be allowed");
-    assert_eq!(game.state().phase, GamePhase::ClueOpen);
+    });
+
+    assert_eq!(result, Err(GameError::NotCurrentSelector));
+    assert_eq!(game.state(), &snapshot);
 }
 
 #[test]

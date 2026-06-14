@@ -50,6 +50,7 @@ mod tests {
         content::models::QuestionPack,
         domain::jeopardy::{
             Category, Clue, GameAction, GameScenario, JeopardyGame, PlayerState, RoundBoard,
+            Selector,
         },
         players::models::PlayerSummary,
         sessions::runtime::RuntimeSession,
@@ -115,7 +116,7 @@ mod tests {
             .apply(
                 99,
                 GameAction::SelectClue {
-                    player_id: 7,
+                    actor: Selector::Moderator,
                     category_index: 0,
                     clue_index: 0,
                 },

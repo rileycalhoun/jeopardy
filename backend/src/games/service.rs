@@ -285,7 +285,7 @@ pub(crate) async fn select_clue(
     token: Option<&str>,
     request: SelectClueRequest,
 ) -> Result<GameStateResponse, AppError> {
-    // The moderator picks the first clue and may always override afterwards.
+    // The moderator may select only while the moderator holds control.
     let game = authenticated_admin_game(state, admin_code, token).await?;
     apply_action(
         state,
@@ -297,6 +297,7 @@ pub(crate) async fn select_clue(
         },
     )
     .await
+    .map_err(turn_violation)
 }
 
 pub(crate) async fn select_clue_as_player(
@@ -603,8 +604,7 @@ async fn validate_admin_token(
     Ok(())
 }
 
-/// Turn the generic gameplay rejection a contestant gets when selecting out of
-/// turn into a clear, dedicated error so the player UI can explain it.
+/// Turn a generic out-of-turn selection rejection into a dedicated API error.
 fn turn_violation(error: AppError) -> AppError {
     match &error {
         AppError::Gameplay(message) if message == "NotCurrentSelector" => AppError::NotYourTurn,

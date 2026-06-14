@@ -15,7 +15,7 @@
 		type QuestionPack
 	} from '$lib/api/games';
 	import { connectAdminGameSocket } from '$lib/api/realtime';
-	import { shouldRefreshAdminLobby } from '$lib/admin-lobby';
+	import { canAdminSelectClue, shouldRefreshAdminLobby } from '$lib/admin-lobby';
 	import JeopardyBoard from '$lib/components/JeopardyBoard.svelte';
 	import Podium from '$lib/components/Podium.svelte';
 	import QuestionModal from '$lib/components/QuestionModal.svelte';
@@ -47,6 +47,7 @@
 
 	const currentRound = $derived(game?.board[game.current_round] ?? null);
 	const isFinished = $derived(game?.phase === 'Completed');
+	const adminCanSelectClue = $derived(game !== null && canAdminSelectClue(game));
 	// Who controls the next clue pick, shown so the host knows whose turn it is.
 	const selectorLabel = $derived.by(() => {
 		if (!game || game.current_selector === null) return 'Moderator';
@@ -71,6 +72,7 @@
 			case 'HttpError':
 				if (error.status === 404) return 'No active game state is available yet.';
 				if (error.status === 401) return 'Host authorization is missing or expired.';
+				if (error.status === 403) return "It's the player's turn to pick a clue.";
 				if (error.status === 409) return 'This game has already started.';
 				return `Server returned ${error.status}.`;
 			case 'JsonParseError':
@@ -232,7 +234,7 @@
 	}
 
 	async function chooseClue(categoryIndex: number, clueIndex: number) {
-		if (adminCode === null || !adminToken || game?.phase !== 'RoundSelection') return;
+		if (adminCode === null || !adminToken || !game || !canAdminSelectClue(game)) return;
 		const result = await selectClue(adminCode, adminToken, categoryIndex, clueIndex);
 		if (result.ok) {
 			applyGameUpdate(result.value.game);
@@ -349,7 +351,7 @@
 						<JeopardyBoard
 							round={currentRound}
 							interactive
-							locked={game.phase !== 'RoundSelection'}
+							locked={!adminCanSelectClue}
 							onSelect={chooseClue}
 						/>
 					{/if}
@@ -379,8 +381,8 @@
 								</p>
 								<p class="mt-2 text-xs text-white/50">
 									{game.current_selector === null
-										? 'You choose the first clue. The board is yours to override anytime.'
-										: 'You can override and pick on their behalf if needed.'}
+										? 'Choose the next clue from the board.'
+										: 'Only the selected player can choose the next clue.'}
 								</p>
 							</div>
 						{/if}

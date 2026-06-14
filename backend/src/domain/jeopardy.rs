@@ -546,20 +546,18 @@ impl JeopardyGame {
         Ok(())
     }
 
-    /// Whether `actor` may pick the next clue. The moderator may always select
-    /// (the first clue and any override); a contestant may only select when
-    /// they currently hold control.
+    /// Whether `actor` may pick the next clue: only whoever currently holds
+    /// control. The moderator picks while in control (the first clue, or after a
+    /// clue nobody answered correctly), and a contestant picks once they have
+    /// earned control. The moderator cannot pick over a contestant's turn.
     fn ensure_can_select(&self, actor: Selector) -> Result<(), GameError> {
-        match actor {
-            Selector::Moderator => Ok(()),
-            Selector::Player(player_id) => {
-                self.player_index(player_id)?;
-                if self.state.current_selector == Selector::Player(player_id) {
-                    Ok(())
-                } else {
-                    Err(GameError::NotCurrentSelector)
-                }
-            }
+        if let Selector::Player(player_id) = actor {
+            self.player_index(player_id)?;
+        }
+        if self.state.current_selector == actor {
+            Ok(())
+        } else {
+            Err(GameError::NotCurrentSelector)
         }
     }
 
