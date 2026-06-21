@@ -1,0 +1,31 @@
+{
+  "id": "cartoon_network",
+  "title": "Cartoon Network",
+  "questions": [
+    {
+      "points": 200,
+      "question": "These are the two main characters of Adventure Time.",
+      "answer": "Who are Finn and Jake?"
+    },
+    {
+      "points": 400,
+      "question": "The Flintstones is set in this time period.",
+      "answer": "What is the Stone Age?"
+    },
+    {
+      "points": 600,
+      "question": "The Powerpuff Girls consist of Blossom, Bubbles, and this third member.",
+      "answer": "Who is Buttercup?"
+    },
+    {
+      "points": 800,
+      "question": "This is the year Cartoon Network debuted.",
+      "answer": "What is 1992?"
+    },
+    {
+      "points": 1000,
+      "question": "This is Shaggy's full name.",
+      "answer": "What is Norville Rogers?"
+    }
+  ]
+}

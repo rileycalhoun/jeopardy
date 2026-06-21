@@ -1,0 +1,31 @@
+{
+  "id": "disney",
+  "title": "Disney",
+  "questions": [
+    {
+      "points": 200,
+      "question": "This person originally voiced Mickey Mouse.",
+      "answer": "Who is Walt Disney?"
+    },
+    {
+      "points": 400,
+      "question": "This show features a high school cheerleader who's also a global crime-fighter.",
+      "answer": "What is Kim Possible?"
+    },
+    {
+      "points": 600,
+      "question": "Lightning McQueen got stranded in this town.",
+      "answer": "What is Radiator Springs?"
+    },
+    {
+      "points": 800,
+      "question": "This is the name of Wendy's dog in Peter Pan.",
+      "answer": "Who is Nana?"
+    },
+    {
+      "points": 1000,
+      "question": "These were Mickey Mouse's first ever spoken words.",
+      "answer": "What is \"Hot Dog!\"?"
+    }
+  ]
+}

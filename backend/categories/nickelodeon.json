@@ -1,0 +1,31 @@
+{
+  "id": "nickelodeon",
+  "title": "Nickelodeon",
+  "questions": [
+    {
+      "points": 200,
+      "question": "This animated animal loves lasagna.",
+      "answer": "Who is Garfield?"
+    },
+    {
+      "points": 400,
+      "question": "These two fairies are Timmy Turner's godparents.",
+      "answer": "Who are Cosmo and Wanda?"
+    },
+    {
+      "points": 600,
+      "question": "This person created shows like Victorious, All That, and iCarly.",
+      "answer": "Who is Dan Schneider?"
+    },
+    {
+      "points": 800,
+      "question": "On Rugrats, Tommy Pickles keeps this tool in his diaper.",
+      "answer": "What is a screwdriver?"
+    },
+    {
+      "points": 1000,
+      "question": "Doug Funnie lives in this town on Doug.",
+      "answer": "What is Bluffington?"
+    }
+  ]
+}
