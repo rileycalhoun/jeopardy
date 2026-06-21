@@ -247,3 +247,55 @@ fn control_stays_with_the_previous_player_when_nobody_answers() {
     assert_eq!(game.state().phase, GamePhase::Completed);
     assert_eq!(game.state().current_selector, Selector::Player(1));
 }
+
+#[test]
+fn skipping_an_unanswered_clue_keeps_control_with_the_moderator() {
+    let mut game = JeopardyGame::new(scenario_with_two_clues()).expect("scenario should build");
+
+    game.apply(GameAction::SelectClue {
+        actor: Selector::Moderator,
+        category_index: 0,
+        clue_index: 0,
+    })
+    .expect("moderator should pick the first clue");
+    game.apply(GameAction::SkipClue)
+        .expect("moderator should be able to skip an unanswered clue");
+
+    assert_eq!(game.state().phase, GamePhase::RoundSelection);
+    assert_eq!(game.state().current_selector, Selector::Moderator);
+    assert!(game.state().rounds[0].categories[0].clues[0].answered);
+    assert_eq!(game.state().players[0].score, 0);
+    assert_eq!(game.state().players[1].score, 0);
+}
+
+#[test]
+fn skipping_a_clue_after_a_player_earned_control_keeps_control_with_that_player() {
+    let mut game = JeopardyGame::new(scenario_with_two_clues()).expect("scenario should build");
+
+    game.apply(GameAction::SelectClue {
+        actor: Selector::Moderator,
+        category_index: 0,
+        clue_index: 0,
+    })
+    .expect("moderator should pick the first clue");
+    game.apply(GameAction::AttemptAnswer {
+        player_id: 1,
+        correct: true,
+    })
+    .expect("player one should win control");
+
+    game.apply(GameAction::SelectClue {
+        actor: Selector::Player(1),
+        category_index: 0,
+        clue_index: 1,
+    })
+    .expect("player one should pick the next clue");
+    game.apply(GameAction::SkipClue)
+        .expect("host should be able to skip the unanswered clue");
+
+    assert_eq!(game.state().phase, GamePhase::Completed);
+    assert_eq!(game.state().current_selector, Selector::Player(1));
+    assert!(game.state().rounds[0].categories[0].clues[1].answered);
+    assert_eq!(game.state().players[0].score, 200);
+    assert_eq!(game.state().players[1].score, 0);
+}

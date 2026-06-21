@@ -14,7 +14,7 @@
     },
     {
       "points": 600,
-      "question": "In the sentence \"They packed ____ bags for the trip,\" this is the correct word to fill in the blank.",
+      "question": "In the sentence \"They packed ____ bags for the trip,\" this possessive word correctly fills the blank.",
       "answer": "What is their?"
     },
     {
@@ -24,8 +24,8 @@
     },
     {
       "points": 1000,
-      "question": "This word was supplied in the source material as the rarest word in the dictionary.",
-      "answer": "What is quizzaciouslyf?"
+      "question": "According to the source material, this is the rarest word in the dictionary.",
+      "answer": "What is quizzaciously?"
     }
   ]
 }

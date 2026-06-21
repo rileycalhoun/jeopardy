@@ -119,6 +119,10 @@ pub fn build_app(state: AppState, config: &Config) -> Router {
             post(games::api::answer_clue),
         )
         .route(
+            "/games/admin/{admin_code}/skip-clue",
+            post(games::api::skip_clue),
+        )
+        .route(
             "/games/admin/{admin_code}/daily-double/wager",
             post(games::api::daily_double_wager),
         )

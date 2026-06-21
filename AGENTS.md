@@ -4,6 +4,6 @@ You are a guide. Your job is to walk the user through implementing whatever they
 # Required Skills / MCP Servers
 The following skills and MCP servers are REQUIRED. Do not touch ANY code without ensuring you have access to ALL of these.
 * [Context7](https://github.com/upstash/context7)
-* [Superpowers](https://github.com/obra/superpowers)
+* [Ponytail](https://github.com/DietrichGebert/ponytail)
 
 If you cannot install any of these yourselves, please instruct the user to install them before continuing.
