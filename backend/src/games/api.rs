@@ -85,8 +85,9 @@ pub async fn start_game(
 pub async fn get_admin_game_state(
     State(state): State<AppState>,
     Path(admin_code): Path<i32>,
+    headers: HeaderMap,
 ) -> AppResult<(StatusCode, Json<GameStateResponse>)> {
-    let game = service::game_state_by_admin_code(&state, admin_code).await?;
+    let game = service::game_state_by_admin_code(&state, admin_code, bearer(&headers)).await?;
     Ok((StatusCode::OK, Json(game)))
 }
 
@@ -101,9 +102,11 @@ pub async fn get_player_game_state(
 pub async fn submit_player_answer(
     State(state): State<AppState>,
     Path(player_code): Path<i32>,
+    headers: HeaderMap,
     Json(request): Json<PlayerAnswerRequest>,
 ) -> AppResult<(StatusCode, Json<GameStateResponse>)> {
-    let game = service::submit_player_answer(&state, player_code, request).await?;
+    let game =
+        service::submit_player_answer(&state, player_code, bearer(&headers), request).await?;
     Ok((StatusCode::OK, Json(game)))
 }
 
@@ -120,9 +123,11 @@ pub async fn select_clue(
 pub async fn select_clue_as_player(
     State(state): State<AppState>,
     Path(player_code): Path<i32>,
+    headers: HeaderMap,
     Json(request): Json<PlayerSelectClueRequest>,
 ) -> AppResult<(StatusCode, Json<GameStateResponse>)> {
-    let game = service::select_clue_as_player(&state, player_code, request).await?;
+    let game =
+        service::select_clue_as_player(&state, player_code, bearer(&headers), request).await?;
     Ok((StatusCode::OK, Json(game)))
 }
 

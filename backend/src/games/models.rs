@@ -42,6 +42,8 @@ pub struct LobbyResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub admin_token: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub current_player_token: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub current_player_id: Option<i64>,
 }
 

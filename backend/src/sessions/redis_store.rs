@@ -1,11 +1,16 @@
 use async_trait::async_trait;
-use redis::{AsyncCommands, aio::ConnectionManager};
+use redis::{AsyncCommands, ExistenceCheck, SetExpiry, SetOptions, aio::ConnectionManager};
+use tokio::time::{Duration, sleep};
 use tracing::debug;
 
 use crate::sessions::{
     runtime::RuntimeSession,
     store::{SESSION_TTL_SECONDS, SessionError, SessionStore, session_key},
 };
+
+const LOCK_TTL_SECONDS: u64 = 5;
+const LOCK_RETRIES: usize = 20;
+const LOCK_RETRY_DELAY: Duration = Duration::from_millis(25);
 
 /// Redis-backed session store. Sessions live under
 /// `jeopardy:game:{game_id}:session` as JSON with a refresh-on-write TTL, so
@@ -22,6 +27,42 @@ impl RedisSessionStore {
 
     fn storage_error(context: &str, err: impl std::fmt::Display) -> SessionError {
         SessionError::Storage(format!("{context}: {err}"))
+    }
+
+    async fn acquire_lock(&self, game_id: i64) -> Result<String, SessionError> {
+        let key = lock_key(game_id);
+        let owner = random_hex_16();
+        let options = SetOptions::default()
+            .conditional_set(ExistenceCheck::NX)
+            .with_expiration(SetExpiry::EX(LOCK_TTL_SECONDS));
+
+        for _ in 0..LOCK_RETRIES {
+            let mut conn = self.conn.clone();
+            let acquired: Option<String> = conn
+                .set_options(&key, &owner, options.clone())
+                .await
+                .map_err(|err| Self::storage_error("lock", err))?;
+            if acquired.is_some() {
+                return Ok(owner);
+            }
+            sleep(LOCK_RETRY_DELAY).await;
+        }
+
+        Err(SessionError::Storage("lock: timed out".to_owned()))
+    }
+
+    async fn release_lock(&self, game_id: i64, owner: &str) {
+        let mut conn = self.conn.clone();
+        let _: redis::RedisResult<i32> = redis::cmd("EVAL")
+            .arg(
+                "if redis.call('GET', KEYS[1]) == ARGV[1] then \
+                 return redis.call('DEL', KEYS[1]) else return 0 end",
+            )
+            .arg(1)
+            .arg(lock_key(game_id))
+            .arg(owner)
+            .query_async(&mut conn)
+            .await;
     }
 }
 
@@ -56,19 +97,71 @@ impl SessionStore for RedisSessionStore {
     }
 
     async fn remove(&self, game_id: i64) -> Result<Option<RuntimeSession>, SessionError> {
+        let lock = self.acquire_lock(game_id).await?;
         let session = match self.get(game_id).await {
             Ok(session) => Some(session),
             Err(SessionError::NotFound) => None,
-            Err(err) => return Err(err),
+            Err(err) => {
+                self.release_lock(game_id, &lock).await;
+                return Err(err);
+            }
         };
         let key = session_key(game_id);
         let mut conn = self.conn.clone();
-        conn.del::<_, ()>(&key)
+        let result = conn
+            .del::<_, ()>(&key)
             .await
-            .map_err(|err| Self::storage_error("remove", err))?;
+            .map_err(|err| Self::storage_error("remove", err));
+        self.release_lock(game_id, &lock).await;
+        result?;
         debug!(game_id, "removed session from redis");
         Ok(session)
     }
+
+    async fn apply(
+        &self,
+        game_id: i64,
+        action: crate::domain::jeopardy::GameAction,
+    ) -> Result<crate::domain::jeopardy::GameState, SessionError> {
+        let lock = self.acquire_lock(game_id).await?;
+        let result = async {
+            let mut session = self.get(game_id).await?;
+            session.apply(action).map_err(SessionError::Game)?;
+            self.save(&session).await?;
+            Ok(session.state().clone())
+        }
+        .await;
+        self.release_lock(game_id, &lock).await;
+        result
+    }
+
+    async fn submit_answer(
+        &self,
+        game_id: i64,
+        player_id: u32,
+        answer: String,
+    ) -> Result<(), SessionError> {
+        let lock = self.acquire_lock(game_id).await?;
+        let result = async {
+            let mut session = self.get(game_id).await?;
+            session
+                .submit_answer(player_id, answer)
+                .map_err(SessionError::InvalidSubmission)?;
+            self.save(&session).await
+        }
+        .await;
+        self.release_lock(game_id, &lock).await;
+        result
+    }
+}
+
+fn lock_key(game_id: i64) -> String {
+    format!("{}:lock", session_key(game_id))
+}
+
+fn random_hex_16() -> String {
+    let bytes: [u8; 16] = rand::random();
+    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
 // Integration tests that need a live Redis. Run them explicitly with:

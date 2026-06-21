@@ -21,6 +21,9 @@ pub enum AppError {
     MissingAdminToken,
     InvalidAdminToken,
     WrongGameForToken,
+    MissingPlayerToken,
+    InvalidPlayerToken,
+    WrongPlayerForToken,
     GameAlreadyStarted,
 }
 
@@ -58,6 +61,15 @@ impl IntoResponse for AppError {
             AppError::MissingAdminToken => (StatusCode::UNAUTHORIZED, "missing_admin_token", false),
             AppError::InvalidAdminToken => (StatusCode::UNAUTHORIZED, "invalid_admin_token", false),
             AppError::WrongGameForToken => (StatusCode::FORBIDDEN, "wrong_game_for_token", false),
+            AppError::MissingPlayerToken => {
+                (StatusCode::UNAUTHORIZED, "missing_player_token", false)
+            }
+            AppError::InvalidPlayerToken => {
+                (StatusCode::UNAUTHORIZED, "invalid_player_token", false)
+            }
+            AppError::WrongPlayerForToken => {
+                (StatusCode::FORBIDDEN, "wrong_player_for_token", false)
+            }
             AppError::GameAlreadyStarted => (StatusCode::CONFLICT, "game_already_started", false),
         };
 

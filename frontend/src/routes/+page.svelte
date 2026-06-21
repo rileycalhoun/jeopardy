@@ -73,6 +73,12 @@
 					`${result.value.current_player_id}`
 				);
 			}
+			if (result.value.current_player_token !== undefined) {
+				localStorage.setItem(
+					`jeopardy-player-token-${playerCode}`,
+					result.value.current_player_token
+				);
+			}
 			playerJoinError = '';
 			await goto(resolve('/lobby/player/[player_code]', { player_code: `${playerCode}` }));
 			return;

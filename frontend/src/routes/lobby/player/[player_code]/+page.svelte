@@ -27,6 +27,7 @@
 	let lobby = $state<Lobby | null>(null);
 	let game = $state<GameView | null>(null);
 	let currentPlayerId = $state<number | null>(null);
+	let playerToken = $state('');
 	let answerInput = $state('');
 	let answerMessage = $state('');
 	let infoMessage = $state('');
@@ -61,6 +62,7 @@
 	const isMyTurn = $derived(
 		game?.phase === 'RoundSelection' &&
 			currentPlayerId !== null &&
+			!!playerToken &&
 			game?.current_selector === currentPlayerId
 	);
 
@@ -70,6 +72,7 @@
 				return 'Could not reach the backend.';
 			case 'HttpError':
 				if (error.status === 404) return 'No lobby matched that player code.';
+				if (error.status === 401) return 'Rejoin from the start page before submitting.';
 				if (error.status === 403) return "It's not your turn to pick a clue.";
 				return `Server returned ${error.status}.`;
 			case 'JsonParseError':
@@ -86,6 +89,10 @@
 			if (result.value.current_player_id !== undefined) {
 				currentPlayerId = result.value.current_player_id;
 				localStorage.setItem(`jeopardy-player-id-${code}`, `${result.value.current_player_id}`);
+			}
+			if (result.value.current_player_token !== undefined) {
+				playerToken = result.value.current_player_token;
+				localStorage.setItem(`jeopardy-player-token-${code}`, playerToken);
 			}
 			if (!game) errorMessage = '';
 			return;
@@ -171,6 +178,7 @@
 		playerCode = parsedCode;
 		const storedPlayerId = localStorage.getItem(`jeopardy-player-id-${parsedCode}`);
 		currentPlayerId = storedPlayerId === null ? null : Number(storedPlayerId);
+		playerToken = localStorage.getItem(`jeopardy-player-token-${parsedCode}`) ?? '';
 
 		void Promise.all([refreshLobby(parsedCode), refreshGame(parsedCode)]).finally(() => {
 			isLoading = false;
@@ -198,12 +206,17 @@
 			return;
 		}
 
+		if (!playerToken) {
+			answerMessage = 'Rejoin from the start page before submitting.';
+			return;
+		}
+
 		if (answerInput.trim() === '') {
 			answerMessage = 'Enter an answer before submitting.';
 			return;
 		}
 
-		const result = await submitPlayerAnswer(playerCode, currentPlayerId, answerInput);
+		const result = await submitPlayerAnswer(playerCode, playerToken, currentPlayerId, answerInput);
 		if (result.ok) {
 			game = result.value.game;
 			answerInput = '';
@@ -217,8 +230,20 @@
 	}
 
 	async function chooseClue(categoryIndex: number, clueIndex: number) {
-		if (playerCode === null || currentPlayerId === null || game?.phase !== 'RoundSelection') return;
-		const result = await selectClueAsPlayer(playerCode, currentPlayerId, categoryIndex, clueIndex);
+		if (
+			playerCode === null ||
+			currentPlayerId === null ||
+			!playerToken ||
+			game?.phase !== 'RoundSelection'
+		)
+			return;
+		const result = await selectClueAsPlayer(
+			playerCode,
+			playerToken,
+			currentPlayerId,
+			categoryIndex,
+			clueIndex
+		);
 		if (result.ok) {
 			game = result.value.game;
 			errorMessage = '';

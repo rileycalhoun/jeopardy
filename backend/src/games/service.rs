@@ -54,10 +54,13 @@ pub(crate) async fn join_game(
         Err(err) => return Err(AppError::Database(err)),
     };
 
+    let player_token = auth::generate_player_token();
+    let player_token_hash = auth::hash_token(&player_token);
     let joined_player = match players::repository::insert_player(
         &state.pool,
         game.id,
         request.display_name,
+        player_token_hash,
     )
     .await
     {
@@ -91,6 +94,7 @@ pub(crate) async fn join_game(
     Ok(LobbyResponse {
         players,
         admin_token: None,
+        current_player_token: Some(player_token),
         current_player_id: Some(joined_player.id),
     })
 }
@@ -113,6 +117,7 @@ pub(crate) async fn get_lobby_by_player_code(
     Ok(LobbyResponse {
         players,
         admin_token: None,
+        current_player_token: None,
         current_player_id: None,
     })
 }
@@ -142,6 +147,7 @@ pub(crate) async fn join_game_as_admin(
     Ok(LobbyResponse {
         players,
         admin_token: Some(token),
+        current_player_token: None,
         current_player_id: None,
     })
 }
@@ -164,6 +170,7 @@ pub(crate) async fn get_lobby_by_admin_code(
     Ok(LobbyResponse {
         players,
         admin_token: None,
+        current_player_token: None,
         current_player_id: None,
     })
 }
@@ -228,17 +235,15 @@ pub(crate) async fn start_game(
         "game started"
     );
 
-    game_state_by_admin_code(state, admin_code).await
+    game_state_by_game_id(state, game.id, true).await
 }
 
 pub(crate) async fn game_state_by_admin_code(
     state: &AppState,
     admin_code: i32,
+    token: Option<&str>,
 ) -> Result<GameStateResponse, AppError> {
-    let game = find_game_by_admin_code(&state.pool, admin_code)
-        .await
-        .map_err(AppError::Database)?
-        .ok_or(AppError::GameNotFound)?;
+    let game = authenticated_admin_game(state, admin_code, token).await?;
     game_state_by_game_id(state, game.id, true).await
 }
 
@@ -256,12 +261,14 @@ pub(crate) async fn game_state_by_player_code(
 pub(crate) async fn submit_player_answer(
     state: &AppState,
     player_code: i32,
+    token: Option<&str>,
     request: PlayerAnswerRequest,
 ) -> Result<GameStateResponse, AppError> {
     let game = find_game_by_player_code(&state.pool, player_code)
         .await
         .map_err(AppError::Database)?
         .ok_or(AppError::GameNotFound)?;
+    validate_player_token(state, game.id, request.player_id, token).await?;
 
     state
         .sessions
@@ -303,12 +310,14 @@ pub(crate) async fn select_clue(
 pub(crate) async fn select_clue_as_player(
     state: &AppState,
     player_code: i32,
+    token: Option<&str>,
     request: PlayerSelectClueRequest,
 ) -> Result<GameStateResponse, AppError> {
     let game = find_game_by_player_code(&state.pool, player_code)
         .await
         .map_err(AppError::Database)?
         .ok_or(AppError::GameNotFound)?;
+    validate_player_token(state, game.id, request.player_id, token).await?;
     apply_action(
         state,
         game.id,
@@ -611,6 +620,29 @@ async fn validate_admin_token(
 
     if row.game_id != game_id {
         return Err(AppError::WrongGameForToken);
+    }
+
+    Ok(())
+}
+
+async fn validate_player_token(
+    state: &AppState,
+    game_id: i64,
+    player_id: u32,
+    token: Option<&str>,
+) -> Result<(), AppError> {
+    let token = token.ok_or(AppError::MissingPlayerToken)?;
+    let token_hash = auth::hash_token(token);
+    let row = players::repository::find_player_by_token_hash(&state.pool, &token_hash)
+        .await
+        .map_err(AppError::Database)?
+        .ok_or(AppError::InvalidPlayerToken)?;
+
+    if row.game_id != game_id {
+        return Err(AppError::WrongGameForToken);
+    }
+    if u32::try_from(row.id).ok() != Some(player_id) {
+        return Err(AppError::WrongPlayerForToken);
     }
 
     Ok(())

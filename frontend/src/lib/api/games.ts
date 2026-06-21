@@ -77,9 +77,14 @@ export function startGame(
 }
 
 export function getAdminGameState(
-	adminCode: number
+	adminCode: number,
+	token: string
 ): Promise<Result<{ game: GameView }, FetchError>> {
-	return safeFetchJson(`${env.PUBLIC_API_URL}/games/admin/${adminCode}/state`, GameStateSchema);
+	return safeFetchJson(`${env.PUBLIC_API_URL}/games/admin/${adminCode}/state`, GameStateSchema, {
+		headers: {
+			Authorization: `Bearer ${token}`
+		}
+	});
 }
 
 export function getPlayerGameState(
@@ -107,6 +112,7 @@ export function selectClue(
 
 export function selectClueAsPlayer(
 	playerCode: number,
+	token: string,
 	playerId: number,
 	categoryIndex: number,
 	clueIndex: number
@@ -116,9 +122,7 @@ export function selectClueAsPlayer(
 		GameStateSchema,
 		{
 			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json'
-			},
+			headers: authJsonHeaders(token),
 			body: JSON.stringify({
 				player_id: playerId,
 				category_index: categoryIndex,
@@ -145,24 +149,27 @@ export function skipClue(
 	adminCode: number,
 	token: string
 ): Promise<Result<{ game: GameView }, FetchError>> {
-	return safeFetchJson(`${env.PUBLIC_API_URL}/games/admin/${adminCode}/skip-clue`, GameStateSchema, {
-		method: 'POST',
-		headers: {
-			Authorization: `Bearer ${token}`
+	return safeFetchJson(
+		`${env.PUBLIC_API_URL}/games/admin/${adminCode}/skip-clue`,
+		GameStateSchema,
+		{
+			method: 'POST',
+			headers: {
+				Authorization: `Bearer ${token}`
+			}
 		}
-	});
+	);
 }
 
 export function submitPlayerAnswer(
 	playerCode: number,
+	token: string,
 	playerId: number,
 	answer: string
 ): Promise<Result<{ game: GameView }, FetchError>> {
 	return safeFetchJson(`${env.PUBLIC_API_URL}/games/player/${playerCode}/answer`, GameStateSchema, {
 		method: 'POST',
-		headers: {
-			'Content-Type': 'application/json'
-		},
+		headers: authJsonHeaders(token),
 		body: JSON.stringify({ player_id: playerId, answer })
 	});
 }

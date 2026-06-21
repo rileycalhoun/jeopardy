@@ -105,7 +105,8 @@
 	}
 
 	async function refreshState(code: number) {
-		const result = await getAdminGameState(code);
+		if (!adminToken) return;
+		const result = await getAdminGameState(code, adminToken);
 		if (result.ok) {
 			applyGameUpdate(result.value.game);
 			errorMessage = '';
@@ -476,11 +477,7 @@
 								Incorrect
 							</button>
 							{#if game.active_clue.submissions.length === 0}
-								<button
-									class="show-button-outline"
-									disabled={isBusy}
-									onclick={skipActiveClue}
-								>
+								<button class="show-button-outline" disabled={isBusy} onclick={skipActiveClue}>
 									Skip Question
 								</button>
 							{/if}

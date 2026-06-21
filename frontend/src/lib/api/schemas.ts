@@ -11,6 +11,7 @@ export const PlayerSummarySchema = z.object({
 export const LobbySchema = z.object({
 	players: z.array(PlayerSummarySchema),
 	admin_token: z.string().optional(),
+	current_player_token: z.string().optional(),
 	current_player_id: z.number().int().optional()
 });
 
