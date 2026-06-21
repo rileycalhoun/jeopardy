@@ -215,8 +215,8 @@ remain REST-only; sockets carry `{"type":"ping"}` heartbeats from clients.
 ## Category Pack Format
 
 Category packs live in `backend/categories/*.json`. Each selected category
-contributes one randomly selected clue for each point value: 100, 200, 300,
-400, and 500. The selected clues are fixed when the game starts.
+contributes one randomly selected clue for each point value: 200, 400, 600,
+800, and 1000. The selected clues are fixed when the game starts.
 
 ```json
 {
@@ -225,7 +225,7 @@ contributes one randomly selected clue for each point value: 100, 200, 300,
   "description": "Questions about games, consoles, characters, and gaming history.",
   "questions": [
     {
-      "points": 100,
+      "points": 200,
       "question": "What Nintendo franchise features Link as its main playable hero?",
       "answer": "The Legend of Zelda"
     }

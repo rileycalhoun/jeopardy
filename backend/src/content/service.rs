@@ -204,7 +204,7 @@ mod tests {
 
     fn category_pack(id: &str, title: &str) -> CategoryPack {
         let mut questions = Vec::new();
-        for points in [100, 200, 300, 400, 500] {
+        for points in [200, 400, 600, 800, 1000] {
             questions.push(category_question(points, "A"));
             questions.push(category_question(points, "B"));
         }
@@ -219,7 +219,7 @@ mod tests {
     }
 
     #[test]
-    fn generated_board_uses_one_question_per_point_value_per_category() {
+    fn generated_board_uses_one_question_per_classic_point_value_per_category() {
         let categories = vec![
             category_pack("video_games", "Video Games"),
             category_pack("movies", "Movies"),
@@ -231,7 +231,7 @@ mod tests {
         assert_eq!(board.rounds[0].categories.len(), 2);
         for category in &board.rounds[0].categories {
             let values: Vec<i32> = category.clues.iter().map(|clue| clue.value).collect();
-            assert_eq!(values, vec![100, 200, 300, 400, 500]);
+            assert_eq!(values, vec![200, 400, 600, 800, 1000]);
             assert_eq!(category.clues.len(), 5);
         }
     }

@@ -190,11 +190,11 @@ mod category_tests {
                 "title": "{title}",
                 "description": "Example category",
                 "questions": [
-                    {{ "points": 100, "question": "100?", "answer": "100!" }},
                     {{ "points": 200, "question": "200?", "answer": "200!" }},
-                    {{ "points": 300, "question": "300?", "answer": "300!" }},
                     {{ "points": 400, "question": "400?", "answer": "400!" }},
-                    {{ "points": 500, "question": "500?", "answer": "500!" }}
+                    {{ "points": 600, "question": "600?", "answer": "600!" }},
+                    {{ "points": 800, "question": "800?", "answer": "800!" }},
+                    {{ "points": 1000, "question": "1000?", "answer": "1000!" }}
                 ]
             }}"#
         )

@@ -3,7 +3,7 @@ use std::{collections::HashMap, fmt};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-pub const POINT_VALUES: [i32; 5] = [100, 200, 300, 400, 500];
+pub const POINT_VALUES: [i32; 5] = [200, 400, 600, 800, 1000];
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct CategoryPack {
@@ -189,9 +189,9 @@ mod category_tests {
     }
 
     #[test]
-    fn category_requires_all_point_values_for_gameplay() {
+    fn category_requires_all_classic_jeopardy_point_values_for_gameplay() {
         let mut category = valid_category();
-        category.questions.retain(|question| question.points != 500);
+        category.questions.retain(|question| question.points != 1000);
 
         let err = category
             .validate()
@@ -199,7 +199,7 @@ mod category_tests {
 
         assert!(
             err.to_string()
-                .contains("no questions for required point value 500")
+                .contains("no questions for required point value 1000")
         );
     }
 

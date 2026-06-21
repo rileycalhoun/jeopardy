@@ -208,10 +208,10 @@ mod tests {
                     id: "movies".to_owned(),
                     title: "Movies".to_owned(),
                     clues: vec![BoardClue {
-                        label: "$100".to_owned(),
+                        label: "$200".to_owned(),
                         question: "This movie has a shark.".to_owned(),
                         answer: "Jaws".to_owned(),
-                        value: 100,
+                        value: 200,
                         daily_double: false,
                     }],
                 }],
@@ -238,8 +238,8 @@ mod tests {
                     title: "Movies".to_owned(),
                     clues: vec![Clue {
                         id: 1,
-                        label: "$100".to_owned(),
-                        value: 100,
+                        label: "$200".to_owned(),
+                        value: 200,
                         is_daily_double: false,
                         answered: false,
                     }],
