@@ -1,0 +1,31 @@
+{
+  "id": "science",
+  "title": "Science",
+  "questions": [
+    {
+      "points": 200,
+      "question": "This is the chemical symbol for carbon.",
+      "answer": "What is C?"
+    },
+    {
+      "points": 400,
+      "question": "This planet is closest to the sun.",
+      "answer": "What is Mercury?"
+    },
+    {
+      "points": 600,
+      "question": "This layer of gases surrounds Earth.",
+      "answer": "What is the atmosphere?"
+    },
+    {
+      "points": 800,
+      "question": "This branch of science studies plants.",
+      "answer": "What is botany?"
+    },
+    {
+      "points": 1000,
+      "question": "This is the largest organ in the human body.",
+      "answer": "What is skin?"
+    }
+  ]
+}

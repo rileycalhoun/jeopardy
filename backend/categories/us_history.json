@@ -1,0 +1,31 @@
+{
+  "id": "us_history",
+  "title": "US History",
+  "questions": [
+    {
+      "points": 200,
+      "question": "This explorer reached North America in 1492.",
+      "answer": "Who is Columbus?"
+    },
+    {
+      "points": 400,
+      "question": "This U.S. city has the largest population.",
+      "answer": "What is New York City?"
+    },
+    {
+      "points": 600,
+      "question": "This inventor is credited with inventing the telephone.",
+      "answer": "Who is Alexander Graham Bell?"
+    },
+    {
+      "points": 800,
+      "question": "This year marked the start of World War I.",
+      "answer": "What is 1914?"
+    },
+    {
+      "points": 1000,
+      "question": "This woman became the first female justice on the U.S. Supreme Court.",
+      "answer": "Who is Sandra Day O'Connor?"
+    }
+  ]
+}

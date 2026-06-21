@@ -1,0 +1,31 @@
+{
+  "id": "tv",
+  "title": "TV",
+  "questions": [
+    {
+      "points": 200,
+      "question": "Sydney Sweeney's breakout role came on this HBO drama.",
+      "answer": "What is Euphoria?"
+    },
+    {
+      "points": 400,
+      "question": "Season 4 of Bridgerton uses this fairy-tale trope.",
+      "answer": "What is Cinderella?"
+    },
+    {
+      "points": 600,
+      "question": "Friends fans got their coffee at this shop.",
+      "answer": "What is Central Perk?"
+    },
+    {
+      "points": 800,
+      "question": "This year saw the premiere of Game of Thrones.",
+      "answer": "What is 2011?"
+    },
+    {
+      "points": 1000,
+      "question": "This sitcom family includes Mike, Carol, Greg, Marcia, Peter, Jan, Bobby, and Cindy.",
+      "answer": "What is The Brady Bunch?"
+    }
+  ]
+}
