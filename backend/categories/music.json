@@ -1,0 +1,31 @@
+{
+  "id": "music",
+  "title": "Music",
+  "questions": [
+    {
+      "points": 200,
+      "question": "In 2026, this rapper became the most-awarded rapper in Grammy history.",
+      "answer": "Who is Kendrick Lamar?"
+    },
+    {
+      "points": 400,
+      "question": "This viral track featuring Jennie and Tame Impala sparked social media trends and fan edits.",
+      "answer": "What is Dracula?"
+    },
+    {
+      "points": 600,
+      "question": "This singer won the first season of American Idol.",
+      "answer": "Who is Kelly Clarkson?"
+    },
+    {
+      "points": 800,
+      "question": "\"8 Mile\" takes its name from a road in this Michigan city.",
+      "answer": "What is Detroit?"
+    },
+    {
+      "points": 1000,
+      "question": "Before Foo Fighters, Dave Grohl drummed for this grunge band.",
+      "answer": "What is Nirvana?"
+    }
+  ]
+}

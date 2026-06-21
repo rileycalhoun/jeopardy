@@ -3,7 +3,7 @@ use std::time::SystemTime;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    content::models::QuestionPack,
+    content::models::BoardContent,
     domain::jeopardy::{GameAction, GameError, GameState, JeopardyGame},
     players::models::PlayerSummary,
 };
@@ -20,8 +20,8 @@ pub struct AnswerSubmission {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RuntimeSession {
     pub game_id: i64,
-    pub question_pack_id: String,
-    pack: QuestionPack,
+    pub content_id: String,
+    board_content: BoardContent,
     roster: Vec<PlayerSummary>,
     game: JeopardyGame,
     submissions: Vec<AnswerSubmission>,
@@ -31,15 +31,15 @@ pub struct RuntimeSession {
 impl RuntimeSession {
     pub fn new(
         game_id: i64,
-        question_pack_id: String,
-        pack: QuestionPack,
+        content_id: String,
+        board_content: BoardContent,
         roster: Vec<PlayerSummary>,
         game: JeopardyGame,
     ) -> Self {
         Self {
             game_id,
-            question_pack_id,
-            pack,
+            content_id,
+            board_content,
             roster,
             game,
             submissions: Vec::new(),
@@ -51,8 +51,8 @@ impl RuntimeSession {
         self.game.state()
     }
 
-    pub fn pack(&self) -> &QuestionPack {
-        &self.pack
+    pub fn board_content(&self) -> &BoardContent {
+        &self.board_content
     }
 
     pub fn roster(&self) -> &[PlayerSummary] {

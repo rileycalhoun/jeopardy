@@ -1,0 +1,56 @@
+{
+  "id": "movies",
+  "title": "Movies",
+  "questions": [
+    {
+      "points": 200,
+      "question": "In Disney's Moana, this demigod accompanies the title character on her voyage.",
+      "answer": "Who is Maui?"
+    },
+    {
+      "points": 200,
+      "question": "This shark thriller includes the line, \"You're gonna need a bigger boat.\"",
+      "answer": "What is Jaws?"
+    },
+    {
+      "points": 400,
+      "question": "In Project Hail Mary, Ryan Gosling's character meets this alien.",
+      "answer": "Who is Rocky?"
+    },
+    {
+      "points": 400,
+      "question": "At the 2026 Oscars, this actor won Best Actor.",
+      "answer": "Who is Michael B. Jordan?"
+    },
+    {
+      "points": 600,
+      "question": "In Obsession, Bear's wish is granted by this item.",
+      "answer": "What is the One Wish Willow?"
+    },
+    {
+      "points": 600,
+      "question": "This James Cameron film remains the highest-grossing movie of all time.",
+      "answer": "What is Avatar?"
+    },
+    {
+      "points": 800,
+      "question": "This actress won her first Golden Globe for The Substance.",
+      "answer": "Who is Demi Moore?"
+    },
+    {
+      "points": 800,
+      "question": "The Housemaid is based on a novel by this author.",
+      "answer": "Who is Freida McFadden?"
+    },
+    {
+      "points": 1000,
+      "question": "Any three of these were introduced as Riley's new emotions in Inside Out 2.",
+      "answer": "What are anxiety, envy, embarrassment, and ennui?"
+    },
+    {
+      "points": 1000,
+      "question": "The Conversation, Apocalypse Now, and The Godfather were all directed by this filmmaker.",
+      "answer": "Who is Francis Ford Coppola?"
+    }
+  ]
+}

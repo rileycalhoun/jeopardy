@@ -76,7 +76,7 @@ impl SessionStore for RedisSessionStore {
 #[cfg(test)]
 mod tests {
     use crate::{
-        content::models::QuestionPack,
+        content::models::{BoardCategory, BoardClue, BoardContent, BoardRound},
         domain::jeopardy::{
             Category, Clue, GameAction, GameScenario, JeopardyGame, PlayerState, RoundBoard,
             Selector,
@@ -116,10 +116,23 @@ mod tests {
         RuntimeSession::new(
             game_id,
             "classic".to_owned(),
-            QuestionPack {
+            BoardContent {
                 id: "classic".to_owned(),
                 title: "Classic".to_owned(),
-                rounds: Vec::new(),
+                rounds: vec![BoardRound {
+                    name: "Jeopardy".to_owned(),
+                    categories: vec![BoardCategory {
+                        id: "rust".to_owned(),
+                        title: "Rust".to_owned(),
+                        clues: vec![BoardClue {
+                            label: "$200".to_owned(),
+                            question: "This keyword creates an immutable binding.".to_owned(),
+                            answer: "What is let?".to_owned(),
+                            value: 200,
+                            daily_double: false,
+                        }],
+                    }],
+                }],
                 final_jeopardy: None,
             },
             vec![PlayerSummary {

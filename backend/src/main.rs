@@ -6,7 +6,7 @@ use tokio::net::TcpListener;
 use tracing::{error, info};
 
 use crate::{
-    app::build_app, config::Config, content::loader::QuestionPackLoader, realtime::hub::Hub,
+    app::build_app, config::Config, content::loader::CategoryPackLoader, realtime::hub::Hub,
     sessions::redis_store::RedisSessionStore, state::AppState,
 };
 
@@ -47,7 +47,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             info!(
                 bind_address = %config.bind_address,
                 bind_port = config.bind_port,
-                question_pack_dir = %config.question_pack_dir,
+                category_dir = %config.category_dir,
                 "configuration loaded"
             );
             config
@@ -95,7 +95,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let state = AppState {
         pool,
-        question_packs: QuestionPackLoader::new(&config.question_pack_dir),
+        categories: CategoryPackLoader::new(&config.category_dir),
         sessions: Arc::new(RedisSessionStore::new(redis.clone())),
         redis,
         hub: Hub::default(),

@@ -65,7 +65,7 @@ pub async fn find_game_by_admin_code(
 pub async fn mark_game_started(
     pool: &Pool<Postgres>,
     game_id: i64,
-    question_pack_id: String,
+    content_id: String,
 ) -> Result<(), sqlx::Error> {
     sqlx::query(
         r#"
@@ -77,7 +77,7 @@ pub async fn mark_game_started(
         "#,
     )
     .bind(game_id)
-    .bind(question_pack_id)
+    .bind(content_id)
     .execute(pool)
     .await?;
 

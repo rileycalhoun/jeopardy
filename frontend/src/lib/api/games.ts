@@ -4,18 +4,18 @@ import { type Result } from 'ripthrow';
 import { env } from '$env/dynamic/public';
 
 import {
+	CategoriesSchema,
 	CreateGameSchema,
 	FinishGameSchema,
 	GameStateSchema,
 	LobbySchema,
-	PacksSchema,
+	type CategorySummary,
 	type CreateGameResponse,
 	type GameView,
-	type Lobby,
-	type QuestionPack
+	type Lobby
 } from '$lib/api/schemas';
 
-export type { CreateGameResponse, GameView, Lobby, QuestionPack };
+export type { CategorySummary, CreateGameResponse, GameView, Lobby };
 
 export type JoinPlayerRequest = {
 	player_code: number;
@@ -60,19 +60,19 @@ export function getAdminLobby(adminCode: number): Promise<Result<Lobby, FetchErr
 	return safeFetchJson(`${env.PUBLIC_API_URL}/games/admin/${adminCode}`, LobbySchema);
 }
 
-export function listQuestionPacks(): Promise<Result<{ packs: QuestionPack[] }, FetchError>> {
-	return safeFetchJson(`${env.PUBLIC_API_URL}/games/packs`, PacksSchema);
+export function listCategories(): Promise<Result<{ categories: CategorySummary[] }, FetchError>> {
+	return safeFetchJson(`${env.PUBLIC_API_URL}/games/categories`, CategoriesSchema);
 }
 
 export function startGame(
 	adminCode: number,
 	token: string,
-	questionPackId: string
+	categoryIds: string[]
 ): Promise<Result<{ game: GameView }, FetchError>> {
 	return safeFetchJson(`${env.PUBLIC_API_URL}/games/admin/${adminCode}/start`, GameStateSchema, {
 		method: 'POST',
 		headers: authJsonHeaders(token),
-		body: JSON.stringify({ question_pack_id: questionPackId })
+		body: JSON.stringify({ category_ids: categoryIds })
 	});
 }
 

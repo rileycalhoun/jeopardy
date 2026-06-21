@@ -4,7 +4,7 @@ pub struct Config {
     pub bind_address: String,
     pub bind_port: u16,
     pub frontend_origin: String,
-    pub question_pack_dir: String,
+    pub category_dir: String,
 }
 
 impl Config {
@@ -21,8 +21,7 @@ impl Config {
             bind_port: bind_port,
             frontend_origin: std::env::var("FRONTEND_ORIGIN")
                 .unwrap_or("http://localhost:5173".to_owned()),
-            question_pack_dir: std::env::var("QUESTION_PACK_DIR")
-                .unwrap_or("./question-packs".to_owned()),
+            category_dir: std::env::var("CATEGORY_DIR").unwrap_or("./categories".to_owned()),
         })
     }
 }

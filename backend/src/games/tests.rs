@@ -2,7 +2,12 @@ use sqlx::{PgPool, Row};
 
 use super::repository;
 
+// Integration tests that need a live Postgres instance. Run them explicitly
+// with:
+//   DATABASE_URL=postgres://postgres:password@127.0.0.1:5432/docker \
+//   cargo test --manifest-path backend/Cargo.toml --bin jeopardy-clone games::tests -- --ignored
 #[sqlx::test]
+#[ignore = "requires DATABASE_URL and a running Postgres instance"]
 async fn persists_started_game_metadata(pool: PgPool) -> sqlx::Result<()> {
     let created_game = repository::insert_game(&pool, "GAME01".to_owned(), 123_456, 654_321)
         .await?
@@ -54,6 +59,7 @@ async fn persists_started_game_metadata(pool: PgPool) -> sqlx::Result<()> {
 }
 
 #[sqlx::test]
+#[ignore = "requires DATABASE_URL and a running Postgres instance"]
 async fn persists_active_admin_token_lookup(pool: PgPool) -> sqlx::Result<()> {
     let created_game = repository::insert_game(&pool, "GAME02".to_owned(), 222_222, 333_333)
         .await?

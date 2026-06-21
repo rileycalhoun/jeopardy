@@ -9,8 +9,8 @@ Implemented now:
 - Game creation with separate admin and player join codes.
 - Player lobby joins with display-name persistence.
 - Admin and player lobby pages.
-- File-backed JSON question packs in `backend/question-packs/`.
-- Backend-owned runtime gameplay sessions built from lobby players and a selected pack.
+- File-backed JSON category packs in `backend/categories/`.
+- Backend-owned runtime gameplay sessions built from lobby players and selected categories.
 - Runtime sessions stored in Redis, so active gameplay survives backend restarts and works across multiple backend instances.
 - WebSocket live updates for lobby and game state, with Redis pub/sub fan-out between instances and a slow-polling frontend fallback.
 - Admin token issuance on admin join; gameplay writes require `Authorization: Bearer <token>`.
@@ -21,13 +21,13 @@ Implemented now:
 Still limited:
 
 - Players do not buzz in. The host controls scoring.
-- Pack authoring is JSON-only.
+- Category authoring is JSON-only.
 
 ## Storage Model
 
 PostgreSQL is the durable source of truth for long-lived records: the `games`
 table, player records, admin token hashes, game status metadata, the selected
-question pack id, and `started_at`/`completed_at` timestamps.
+content id, and `started_at`/`completed_at` timestamps.
 
 Redis holds temporary runtime state for active games: the serialized
 `RuntimeSession` (engine state, active clue, answer submissions, current
@@ -39,7 +39,7 @@ Redis session and marks the Postgres game record completed.
 ## Project Layout
 
 ```text
-backend/   Rust, Axum, SQLx, Postgres, content packs, Jeopardy engine
+backend/   Rust, Axum, SQLx, Postgres, category content, Jeopardy engine
 frontend/  SvelteKit, TypeScript, Tailwind, Vitest
 docs/      Backend gameplay design, implementation plan, and testing notes
 ```
@@ -94,7 +94,7 @@ REDIS_URL=redis://redis:6379
 BIND_ADDRESS=0.0.0.0
 BIND_PORT=8080
 FRONTEND_ORIGIN=http://localhost:3000
-QUESTION_PACK_DIR=/app/question-packs
+CATEGORY_DIR=/app/categories
 RUST_LOG=info
 LOG_FORMAT=json
 ```
@@ -154,7 +154,7 @@ The production frontend container uses `@sveltejs/adapter-node` and starts with
 2. Share the player code with players.
 3. Players join with a display name.
 4. Open the admin lobby with the admin code.
-5. Choose a question pack and start the game.
+5. Choose categories and start the game.
 6. The host selects clues and marks a selected player correct or incorrect.
 7. Player and host pages receive the board, active clue, and scoreboard state
    live over WebSockets (with slow polling as a fallback).
@@ -175,7 +175,7 @@ GET  /games/admin/{admin_code}
 Gameplay:
 
 ```text
-GET  /games/packs
+GET  /games/categories
 POST /games/admin/{admin_code}/start
 GET  /games/admin/{admin_code}/state
 GET  /games/player/{player_code}/state
@@ -212,42 +212,30 @@ submissions; player sockets receive a redacted view. Unauthenticated sockets
 are closed with an `error` message and close code `4401`. Gameplay commands
 remain REST-only; sockets carry `{"type":"ping"}` heartbeats from clients.
 
-## Question Pack Format
+## Category Pack Format
 
-Packs live in `backend/question-packs/*.json`.
+Category packs live in `backend/categories/*.json`. Each selected category
+contributes one randomly selected clue for each point value: 200, 400, 600,
+800, and 1000. The selected clues are fixed when the game starts.
 
 ```json
 {
-  "id": "classic",
-  "title": "Classic Starter Pack",
-  "rounds": [
+  "id": "video_games",
+  "title": "Video Games",
+  "description": "Questions about games, consoles, characters, and gaming history.",
+  "questions": [
     {
-      "name": "Jeopardy",
-      "categories": [
-        {
-          "title": "Rust",
-          "clues": [
-            {
-              "label": "$200",
-              "question": "This keyword creates a binding.",
-              "answer": "What is let?",
-              "value": 200,
-              "daily_double": false
-            }
-          ]
-        }
-      ]
+      "points": 200,
+      "question": "What Nintendo franchise features Link as its main playable hero?",
+      "answer": "The Legend of Zelda"
     }
-  ],
-  "final_jeopardy": {
-    "category": "Computer History",
-    "question": "This early programmer is often associated with the Analytical Engine.",
-    "answer": "Who is Ada Lovelace?"
-  }
+  ]
 }
 ```
 
-`daily_double` and `final_jeopardy` are optional.
+Required category fields are `id`, `title`, and `questions`. `description` is
+optional. Each question requires `points`, `question`, and `answer`, and valid
+point values are exactly `100`, `200`, `300`, `400`, and `500`.
 
 ## Verification
 

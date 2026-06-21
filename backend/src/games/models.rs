@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    content::models::QuestionPackSummary, games::state::GameView, players::models::PlayerSummary,
+    content::models::CategorySummary, games::state::GameView, players::models::PlayerSummary,
 };
 
 #[derive(Serialize, Deserialize, sqlx::FromRow)]
@@ -46,13 +46,13 @@ pub struct LobbyResponse {
 }
 
 #[derive(Serialize)]
-pub struct QuestionPacksResponse {
-    pub packs: Vec<QuestionPackSummary>,
+pub struct CategoriesResponse {
+    pub categories: Vec<CategorySummary>,
 }
 
 #[derive(Deserialize)]
 pub struct StartGameRequest {
-    pub question_pack_id: String,
+    pub category_ids: Vec<String>,
 }
 
 #[derive(Serialize)]

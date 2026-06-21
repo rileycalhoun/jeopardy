@@ -1,0 +1,31 @@
+{
+  "id": "gen_z_slang",
+  "title": "Gen Z Slang",
+  "questions": [
+    {
+      "points": 200,
+      "question": "This slang adjective means rich, luxurious, or fancy.",
+      "answer": "What is boujee?"
+    },
+    {
+      "points": 400,
+      "question": "This slang adjective means boring, normal, or basic.",
+      "answer": "What is vanilla?"
+    },
+    {
+      "points": 600,
+      "question": "This two-word slang phrase means to make sure someone is having a good time.",
+      "answer": "What is vibe check?"
+    },
+    {
+      "points": 800,
+      "question": "This slang term describes someone who is unrealistic or overly idealistic.",
+      "answer": "What is delulu?"
+    },
+    {
+      "points": 1000,
+      "question": "This slang word describes embarrassing moments or poorly executed jokes.",
+      "answer": "What is cringe?"
+    }
+  ]
+}

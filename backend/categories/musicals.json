@@ -1,0 +1,31 @@
+{
+  "id": "musicals",
+  "title": "Musicals",
+  "questions": [
+    {
+      "points": 200,
+      "question": "\"The Room Where It Happens\" comes from this musical.",
+      "answer": "What is Hamilton?"
+    },
+    {
+      "points": 400,
+      "question": "Tony and Maria's love story unfolds in this musical set amid a teenage street gang war.",
+      "answer": "What is West Side Story?"
+    },
+    {
+      "points": 600,
+      "question": "This musical is Broadway's longest-running show.",
+      "answer": "What is The Phantom of the Opera?"
+    },
+    {
+      "points": 800,
+      "question": "\"The rain in Spain stays mainly in the plain\" comes from this Lerner and Loewe musical.",
+      "answer": "What is My Fair Lady?"
+    },
+    {
+      "points": 1000,
+      "question": "Elder Price is sent to Uganda instead of Orlando in this Broadway hit that debuted in 2011.",
+      "answer": "What is The Book of Mormon?"
+    }
+  ]
+}

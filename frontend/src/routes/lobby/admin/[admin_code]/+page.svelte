@@ -6,13 +6,13 @@
 		getAdminLobby,
 		getAdminGameState,
 		joinAdminGame,
-		listQuestionPacks,
+		listCategories,
 		resolveAnswer,
 		selectClue,
 		startGame,
+		type CategorySummary,
 		type GameView,
-		type Lobby,
-		type QuestionPack
+		type Lobby
 	} from '$lib/api/games';
 	import { connectAdminGameSocket } from '$lib/api/realtime';
 	import { canAdminSelectClue, shouldRefreshAdminLobby } from '$lib/admin-lobby';
@@ -31,8 +31,8 @@
 
 	let adminCode = $state<number | null>(null);
 	let lobby = $state<Lobby | null>(null);
-	let packs = $state<QuestionPack[]>([]);
-	let selectedPackId = $state('');
+	let categories = $state<CategorySummary[]>([]);
+	let selectedCategoryIds = $state<string[]>([]);
 	let game = $state<GameView | null>(null);
 	let adminToken = $state('');
 	let errorMessage = $state('');
@@ -80,6 +80,17 @@
 			case 'ValidationError':
 				return 'Server returned unexpected data.';
 		}
+	}
+
+	function toggleCategory(categoryId: string, selected: boolean) {
+		if (selected) {
+			if (!selectedCategoryIds.includes(categoryId)) {
+				selectedCategoryIds = [...selectedCategoryIds, categoryId];
+			}
+			return;
+		}
+
+		selectedCategoryIds = selectedCategoryIds.filter((id) => id !== categoryId);
 	}
 
 	function applyGameUpdate(view: GameView) {
@@ -185,9 +196,9 @@
 		adminCode = parsedCode;
 		adminToken = localStorage.getItem(tokenKey(parsedCode)) ?? '';
 
-		const [lobbyResult, packsResult] = await Promise.all([
+		const [lobbyResult, categoriesResult] = await Promise.all([
 			joinAdminGame({ admin_code: parsedCode }),
-			listQuestionPacks()
+			listCategories()
 		]);
 
 		if (lobbyResult.ok) {
@@ -200,11 +211,13 @@
 			errorMessage = toMessage(lobbyResult.error);
 		}
 
-		if (packsResult.ok) {
-			packs = packsResult.value.packs;
-			selectedPackId = packs[0]?.id ?? '';
+		if (categoriesResult.ok) {
+			categories = categoriesResult.value.categories;
+			selectedCategoryIds = categories
+				.slice(0, Math.min(categories.length, 6))
+				.map((category) => category.id);
 		} else if (!errorMessage) {
-			errorMessage = toMessage(packsResult.error);
+			errorMessage = toMessage(categoriesResult.error);
 		}
 
 		await refreshState(parsedCode);
@@ -218,10 +231,10 @@
 		}
 	}
 
-	async function startSelectedPack() {
-		if (adminCode === null || !adminToken || !selectedPackId) return;
+	async function startSelectedCategories() {
+		if (adminCode === null || !adminToken || selectedCategoryIds.length === 0) return;
 		isBusy = true;
-		const result = await startGame(adminCode, adminToken, selectedPackId);
+		const result = await startGame(adminCode, adminToken, selectedCategoryIds);
 		isBusy = false;
 		if (result.ok) {
 			applyGameUpdate(result.value.game);
@@ -316,21 +329,51 @@
 					<div class="show-panel">
 						<h2 class="font-display text-xl font-bold tracking-wide uppercase">Start Game</h2>
 						<p class="mt-2 text-sm text-white/70">
-							Pick a question pack and open the board once your contestants are in.
+							Pick the categories for this game and open the board once your contestants are in.
 						</p>
-						<div class="mt-4 flex flex-col gap-3 sm:flex-row">
-							<select bind:value={selectedPackId} class="show-input">
-								{#each packs as pack (pack.id)}
-									<option value={pack.id}>{pack.title}</option>
-								{/each}
-							</select>
+						<div class="mt-4 grid gap-3 sm:grid-cols-2">
+							{#each categories as category (category.id)}
+								<label
+									class="rounded-md border border-white/10 bg-board-deep/70 p-3 transition data-[selected=true]:border-gold data-[selected=true]:bg-gold/10"
+									data-selected={selectedCategoryIds.includes(category.id)}
+								>
+									<span class="flex items-start gap-3">
+										<input
+											type="checkbox"
+											class="mt-1 h-4 w-4 accent-gold"
+											checked={selectedCategoryIds.includes(category.id)}
+											onchange={(event) => toggleCategory(category.id, event.currentTarget.checked)}
+										/>
+										<span>
+											<span class="block font-display text-sm font-bold text-gold-soft uppercase">
+												{category.title}
+											</span>
+											{#if category.description}
+												<span class="mt-1 block text-sm text-white/60">{category.description}</span>
+											{/if}
+										</span>
+									</span>
+								</label>
+							{/each}
+							{#if categories.length === 0}
+								<p
+									class="rounded-md border border-white/10 bg-board-deep/70 p-3 text-sm text-white/60"
+								>
+									No playable categories are available.
+								</p>
+							{/if}
+						</div>
+						<div class="mt-4 flex items-center gap-3">
 							<button
 								class="show-button-gold"
-								disabled={isBusy || !selectedPackId}
-								onclick={startSelectedPack}
+								disabled={isBusy || selectedCategoryIds.length === 0}
+								onclick={startSelectedCategories}
 							>
 								Start
 							</button>
+							<p class="text-sm text-white/60">
+								{selectedCategoryIds.length} selected
+							</p>
 						</div>
 					</div>
 					{#if lobby}

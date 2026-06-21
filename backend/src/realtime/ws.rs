@@ -246,7 +246,7 @@ async fn send_initial_state(
             let include_answers = matches!(audience, Audience::Admin);
             let game = build_game_view(
                 session.state(),
-                session.pack(),
+                session.board_content(),
                 include_answers,
                 session.submissions(),
             );

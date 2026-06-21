@@ -13,7 +13,7 @@ pub enum AppError {
     GameCreationExhausted,
     GameNotFound,
     DuplicatePlayerName,
-    QuestionPack(String),
+    CategoryContent(String),
     SessionNotFound,
     SessionStorage(String),
     Gameplay(String),
@@ -44,7 +44,9 @@ impl IntoResponse for AppError {
             ),
             AppError::GameNotFound => (StatusCode::NOT_FOUND, "game_not_found", false),
             AppError::DuplicatePlayerName => (StatusCode::CONFLICT, "duplicate_player_name", false),
-            AppError::QuestionPack(_) => (StatusCode::BAD_REQUEST, "question_pack_error", false),
+            AppError::CategoryContent(_) => {
+                (StatusCode::BAD_REQUEST, "category_content_error", false)
+            }
             AppError::SessionNotFound => (StatusCode::NOT_FOUND, "game_session_not_found", false),
             AppError::SessionStorage(_) => (
                 StatusCode::INTERNAL_SERVER_ERROR,

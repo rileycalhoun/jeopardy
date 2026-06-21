@@ -1,0 +1,31 @@
+{
+  "id": "grammar",
+  "title": "Grammar",
+  "questions": [
+    {
+      "points": 200,
+      "question": "In grammar, this part of speech describes an action or state.",
+      "answer": "What is a verb?"
+    },
+    {
+      "points": 400,
+      "question": "In grammar, this term refers to a word that modifies a noun.",
+      "answer": "What is an adjective?"
+    },
+    {
+      "points": 600,
+      "question": "In the sentence \"They packed ____ bags for the trip,\" this is the correct word to fill in the blank.",
+      "answer": "What is their?"
+    },
+    {
+      "points": 800,
+      "question": "These are words that sound the same but have different meanings.",
+      "answer": "What are homophones?"
+    },
+    {
+      "points": 1000,
+      "question": "This word was supplied in the source material as the rarest word in the dictionary.",
+      "answer": "What is quizzaciouslyf?"
+    }
+  ]
+}
