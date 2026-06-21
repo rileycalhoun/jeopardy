@@ -110,6 +110,7 @@ pub enum GameAction {
         category_index: usize,
         clue_index: usize,
     },
+    SkipClue,
     AttemptAnswer {
         player_id: PlayerId,
         correct: bool,
@@ -211,6 +212,7 @@ impl JeopardyGame {
                 category_index,
                 clue_index,
             } => self.select_clue(actor, category_index, clue_index),
+            GameAction::SkipClue => self.skip_clue(),
             GameAction::AttemptAnswer { player_id, correct } => {
                 self.attempt_answer(player_id, correct)
             }
@@ -314,6 +316,17 @@ impl JeopardyGame {
             self.advance_after_clue();
         }
 
+        Ok(())
+    }
+
+    fn skip_clue(&mut self) -> Result<(), GameError> {
+        if self.state.phase != GamePhase::ClueOpen {
+            return Err(GameError::WrongPhase);
+        }
+
+        self.mark_active_clue_answered()?;
+        self.state.active_clue = None;
+        self.advance_after_clue();
         Ok(())
     }
 

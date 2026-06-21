@@ -9,6 +9,7 @@
 		listCategories,
 		resolveAnswer,
 		selectClue,
+		skipClue,
 		startGame,
 		type CategorySummary,
 		type GameView,
@@ -259,7 +260,22 @@
 
 	async function markAnswer(correct: boolean) {
 		if (adminCode === null || !adminToken || selectedPlayerId === null) return;
+		isBusy = true;
 		const result = await resolveAnswer(adminCode, adminToken, selectedPlayerId, correct);
+		isBusy = false;
+		if (result.ok) {
+			applyGameUpdate(result.value.game);
+			errorMessage = '';
+			return;
+		}
+		errorMessage = toMessage(result.error);
+	}
+
+	async function skipActiveClue() {
+		if (adminCode === null || !adminToken || !game?.active_clue) return;
+		isBusy = true;
+		const result = await skipClue(adminCode, adminToken);
+		isBusy = false;
 		if (result.ok) {
 			applyGameUpdate(result.value.game);
 			errorMessage = '';
@@ -447,16 +463,27 @@
 							</select>
 							<button
 								class="show-button-gold bg-emerald-400 hover:bg-emerald-300"
+								disabled={isBusy}
 								onclick={() => markAnswer(true)}
 							>
 								Correct
 							</button>
 							<button
 								class="show-button-gold bg-red-400 hover:bg-red-300"
+								disabled={isBusy}
 								onclick={() => markAnswer(false)}
 							>
 								Incorrect
 							</button>
+							{#if game.active_clue.submissions.length === 0}
+								<button
+									class="show-button-outline"
+									disabled={isBusy}
+									onclick={skipActiveClue}
+								>
+									Skip Question
+								</button>
+							{/if}
 						</div>
 						{#if game.active_clue.submissions.length > 0}
 							<div class="mt-6">

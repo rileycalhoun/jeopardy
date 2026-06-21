@@ -141,6 +141,18 @@ export function resolveAnswer(
 	});
 }
 
+export function skipClue(
+	adminCode: number,
+	token: string
+): Promise<Result<{ game: GameView }, FetchError>> {
+	return safeFetchJson(`${env.PUBLIC_API_URL}/games/admin/${adminCode}/skip-clue`, GameStateSchema, {
+		method: 'POST',
+		headers: {
+			Authorization: `Bearer ${token}`
+		}
+	});
+}
+
 export function submitPlayerAnswer(
 	playerCode: number,
 	playerId: number,

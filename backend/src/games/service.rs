@@ -340,6 +340,15 @@ pub(crate) async fn answer_clue(
     .await
 }
 
+pub(crate) async fn skip_clue(
+    state: &AppState,
+    admin_code: i32,
+    token: Option<&str>,
+) -> Result<GameStateResponse, AppError> {
+    let game = authenticated_admin_game(state, admin_code, token).await?;
+    apply_action(state, game.id, GameAction::SkipClue).await
+}
+
 pub(crate) async fn daily_double_wager(
     state: &AppState,
     admin_code: i32,
@@ -465,6 +474,7 @@ enum ActionLog {
         category_index: usize,
         clue_index: usize,
     },
+    ClueSkipped,
     ClueResolved {
         player_id: u32,
         correct: bool,
@@ -499,6 +509,7 @@ impl From<&GameAction> for ActionLog {
                 category_index: *category_index,
                 clue_index: *clue_index,
             },
+            GameAction::SkipClue => Self::ClueSkipped,
             GameAction::AttemptAnswer { player_id, correct } => Self::ClueResolved {
                 player_id: *player_id,
                 correct: *correct,
@@ -537,6 +548,7 @@ impl ActionLog {
                 clue_index,
                 "clue selected"
             ),
+            Self::ClueSkipped => info!(game_id, "clue skipped"),
             Self::ClueResolved { player_id, correct } => {
                 info!(game_id, player_id, correct, "clue answer resolved")
             }

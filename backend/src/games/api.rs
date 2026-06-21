@@ -136,6 +136,15 @@ pub async fn answer_clue(
     Ok((StatusCode::OK, Json(game)))
 }
 
+pub async fn skip_clue(
+    State(state): State<AppState>,
+    Path(admin_code): Path<i32>,
+    headers: HeaderMap,
+) -> AppResult<(StatusCode, Json<GameStateResponse>)> {
+    let game = service::skip_clue(&state, admin_code, bearer(&headers)).await?;
+    Ok((StatusCode::OK, Json(game)))
+}
+
 pub async fn daily_double_wager(
     State(state): State<AppState>,
     Path(admin_code): Path<i32>,
