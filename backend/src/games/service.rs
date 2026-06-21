@@ -1,13 +1,13 @@
 use crate::{
-    content::service::build_scenario,
+    content::service::{build_board_from_categories, build_scenario},
     domain::jeopardy::{GameAction, GamePhase, JeopardyGame, Selector},
     error::AppError,
     games::{
         auth, codes,
         models::{
-            AnswerRequest, FinishGameResponse, GameData, GameStateResponse, JoinAdminRequest,
-            JoinGameRequest, LobbyResponse, PlayerAnswerRequest, PlayerSelectClueRequest,
-            QuestionPacksResponse, ResolveRequest, SelectClueRequest, StartGameRequest,
+            AnswerRequest, CategoriesResponse, FinishGameResponse, GameData, GameStateResponse,
+            JoinAdminRequest, JoinGameRequest, LobbyResponse, PlayerAnswerRequest,
+            PlayerSelectClueRequest, ResolveRequest, SelectClueRequest, StartGameRequest,
             WagerRequest,
         },
         repository::{self, find_game_by_admin_code, find_game_by_player_code},
@@ -168,12 +168,9 @@ pub(crate) async fn get_lobby_by_admin_code(
     })
 }
 
-pub(crate) fn list_question_packs(state: &AppState) -> Result<QuestionPacksResponse, AppError> {
-    let packs = state
-        .question_packs
-        .list()
-        .map_err(AppError::QuestionPack)?;
-    Ok(QuestionPacksResponse { packs })
+pub(crate) fn list_categories(state: &AppState) -> Result<CategoriesResponse, AppError> {
+    let categories = state.categories.list().map_err(AppError::CategoryContent)?;
+    Ok(CategoriesResponse { categories })
 }
 
 pub(crate) async fn start_game(
@@ -197,15 +194,17 @@ pub(crate) async fn start_game(
     let players = players::repository::list_players_for_game(&state.pool, game.id)
         .await
         .map_err(AppError::Database)?;
-    let pack = state
-        .question_packs
-        .load(&request.question_pack_id)
-        .map_err(AppError::QuestionPack)?;
-    let scenario = build_scenario(&pack, &players).map_err(AppError::QuestionPack)?;
+    let categories = state
+        .categories
+        .load_selected(&request.category_ids)
+        .map_err(AppError::CategoryContent)?;
+    let board_content =
+        build_board_from_categories(&categories).map_err(AppError::CategoryContent)?;
+    let scenario = build_scenario(&board_content, &players).map_err(AppError::CategoryContent)?;
     let engine =
         JeopardyGame::new(scenario).map_err(|err| AppError::Gameplay(format!("{err:?}")))?;
 
-    repository::mark_game_started(&state.pool, game.id, pack.id.clone())
+    repository::mark_game_started(&state.pool, game.id, board_content.id.clone())
         .await
         .map_err(AppError::Database)?;
 
@@ -213,8 +212,8 @@ pub(crate) async fn start_game(
         .sessions
         .create(RuntimeSession::new(
             game.id,
-            pack.id.clone(),
-            pack.clone(),
+            board_content.id.clone(),
+            board_content.clone(),
             players,
             engine,
         ))
@@ -224,7 +223,8 @@ pub(crate) async fn start_game(
     realtime::notify(state, game.id, UpdateKind::State).await;
     info!(
         game_id = game.id,
-        question_pack_id = %pack.id,
+        category_ids = ?request.category_ids,
+        content_id = %board_content.id,
         "game started"
     );
 
@@ -565,7 +565,7 @@ async fn game_state_by_game_id(
     Ok(GameStateResponse {
         game: build_game_view(
             session.state(),
-            session.pack(),
+            session.board_content(),
             include_answers,
             session.submissions(),
         ),

@@ -1,0 +1,17 @@
+{
+  "id": "music",
+  "title": "Music",
+  "description": "Questions about artists, songs, awards, and music trivia.",
+  "questions": [
+    {
+      "points": 200,
+      "question": "Which rapper made Grammy history in 2026 by becoming the most-awarded rapper of all time?",
+      "answer": "Kendrick Lamar"
+    },
+    {
+      "points": 400,
+      "question": "What viral track, featuring Jennie and Tame Impala, sparked countless social media trends and fan edits?",
+      "answer": "Dracula"
+    }
+  ]
+}

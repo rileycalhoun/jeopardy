@@ -34,9 +34,7 @@ fn assert_valid_selector(state: &GameState) -> Result<(), String> {
             if state.players.iter().any(|player| player.id == id) {
                 Ok(())
             } else {
-                Err(format!(
-                    "current selector {id} does not match any player"
-                ))
+                Err(format!("current selector {id} does not match any player"))
             }
         }
     }

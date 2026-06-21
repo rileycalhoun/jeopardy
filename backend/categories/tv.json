@@ -1,0 +1,32 @@
+{
+  "id": "tv",
+  "title": "TV",
+  "description": "Questions about television shows, characters, and TV history.",
+  "questions": [
+    {
+      "points": 200,
+      "question": "What show was Sydney Sweeney’s breakout role in?",
+      "answer": "Euphoria"
+    },
+    {
+      "points": 400,
+      "question": "What fairytale trope is in Season 4 of Bridgerton?",
+      "answer": "Cinderella"
+    },
+    {
+      "points": 600,
+      "question": "What was the name of the coffee shop in Friends?",
+      "answer": "Central Perk"
+    },
+    {
+      "points": 800,
+      "question": "What year did Game of Thrones premiere?",
+      "answer": "2011"
+    },
+    {
+      "points": 1000,
+      "question": "What TV family is composed of Mike, Carol, Greg, Marcia, Peter, Jan, Bobby, and Cindy?",
+      "answer": "The Brady Bunch"
+    }
+  ]
+}

@@ -77,7 +77,7 @@ pub fn build_app(state: AppState, config: &Config) -> Router {
         );
 
     Router::new()
-        .route("/games/packs", get(games::api::list_question_packs))
+        .route("/games/categories", get(games::api::list_categories))
         .route("/games/new", post(games::api::create_new_game))
         .route("/games/join", post(games::api::join_game_as_player))
         .route("/games/join/player", post(games::api::join_game_as_player))

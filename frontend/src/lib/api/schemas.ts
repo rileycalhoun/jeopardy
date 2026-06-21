@@ -14,13 +14,14 @@ export const LobbySchema = z.object({
 	current_player_id: z.number().int().optional()
 });
 
-export const QuestionPackSchema = z.object({
+export const CategorySummarySchema = z.object({
 	id: z.string(),
-	title: z.string()
+	title: z.string(),
+	description: z.string().optional()
 });
 
-export const PacksSchema = z.object({
-	packs: z.array(QuestionPackSchema)
+export const CategoriesSchema = z.object({
+	categories: z.array(CategorySummarySchema)
 });
 
 export const PlayerScoreSchema = z.object({
@@ -97,6 +98,6 @@ export const FinishGameSchema = z.object({
 
 export type PlayerSummary = z.infer<typeof PlayerSummarySchema>;
 export type Lobby = z.infer<typeof LobbySchema>;
-export type QuestionPack = z.infer<typeof QuestionPackSchema>;
+export type CategorySummary = z.infer<typeof CategorySummarySchema>;
 export type GameView = z.infer<typeof GameViewSchema>;
 export type CreateGameResponse = z.infer<typeof CreateGameSchema>;

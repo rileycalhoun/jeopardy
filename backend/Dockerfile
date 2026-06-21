@@ -20,12 +20,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/target/release/jeopardy-clone /usr/local/bin/jeopardy-clone
-COPY --from=builder /app/question-packs ./question-packs
+COPY --from=builder /app/categories ./categories
 COPY --from=builder /app/migrations ./migrations
 
 ENV BIND_ADDRESS=0.0.0.0 \
     BIND_PORT=8080 \
-    QUESTION_PACK_DIR=/app/question-packs \
+    CATEGORY_DIR=/app/categories \
     RUST_LOG=info \
     LOG_FORMAT=json
 

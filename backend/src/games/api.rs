@@ -9,9 +9,9 @@ use crate::{
     games::{
         auth,
         models::{
-            AnswerRequest, CreateGameResponse, FinishGameResponse, GameStateResponse,
-            JoinAdminRequest, JoinGameRequest, LobbyResponse, PlayerAnswerRequest,
-            PlayerSelectClueRequest, QuestionPacksResponse, ResolveRequest, SelectClueRequest,
+            AnswerRequest, CategoriesResponse, CreateGameResponse, FinishGameResponse,
+            GameStateResponse, JoinAdminRequest, JoinGameRequest, LobbyResponse,
+            PlayerAnswerRequest, PlayerSelectClueRequest, ResolveRequest, SelectClueRequest,
             StartGameRequest, WagerRequest,
         },
         service,
@@ -32,11 +32,11 @@ pub async fn create_new_game(
     ))
 }
 
-pub async fn list_question_packs(
+pub async fn list_categories(
     State(state): State<AppState>,
-) -> AppResult<(StatusCode, Json<QuestionPacksResponse>)> {
-    let packs = service::list_question_packs(&state)?;
-    Ok((StatusCode::OK, Json(packs)))
+) -> AppResult<(StatusCode, Json<CategoriesResponse>)> {
+    let categories = service::list_categories(&state)?;
+    Ok((StatusCode::OK, Json(categories)))
 }
 
 pub async fn join_game_as_player(

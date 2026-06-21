@@ -78,13 +78,13 @@ async fn broadcast_to_local_clients(state: &AppState, game_id: i64, kind: Update
             Ok(session) => {
                 update.admin_game = Some(build_game_view(
                     session.state(),
-                    session.pack(),
+                    session.board_content(),
                     true,
                     session.submissions(),
                 ));
                 update.player_game = Some(build_game_view(
                     session.state(),
-                    session.pack(),
+                    session.board_content(),
                     false,
                     session.submissions(),
                 ));

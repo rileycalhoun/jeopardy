@@ -4,13 +4,13 @@ use redis::aio::ConnectionManager;
 use sqlx::{Pool, Postgres};
 
 use crate::{
-    content::loader::QuestionPackLoader, realtime::hub::Hub, sessions::store::SessionStore,
+    content::loader::CategoryPackLoader, realtime::hub::Hub, sessions::store::SessionStore,
 };
 
 #[derive(Clone)]
 pub struct AppState {
     pub pool: Pool<Postgres>,
-    pub question_packs: QuestionPackLoader,
+    pub categories: CategoryPackLoader,
     /// Runtime session storage (Redis in production, memory in unit tests).
     pub sessions: Arc<dyn SessionStore>,
     /// Shared Redis connection used for publishing update events.

@@ -384,7 +384,7 @@
 			<LobbyRoster
 				eyebrow="Players"
 				heading={`${lobby.players.length} joined`}
-				message="Wait for the host to choose a pack and open the board."
+				message="Wait for the host to choose categories and open the board."
 				statusLabel="Waiting for host"
 				players={lobby.players}
 			/>
