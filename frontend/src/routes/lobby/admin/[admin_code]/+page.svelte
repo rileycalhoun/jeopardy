@@ -469,21 +469,12 @@
 								Correct
 							</button>
 							<button
-								class="show-button-gold bg-red-400 hover:bg-red-300"
+								class="show-button-outline"
 								disabled={isBusy}
-								onclick={() => markAnswer(false)}
+								onclick={skipActiveClue}
 							>
-								Incorrect
+								Nobody was Correct
 							</button>
-							{#if game.active_clue.submissions.length === 0}
-								<button
-									class="show-button-outline"
-									disabled={isBusy}
-									onclick={skipActiveClue}
-								>
-									Skip Question
-								</button>
-							{/if}
 						</div>
 						{#if game.active_clue.submissions.length > 0}
 							<div class="mt-6">
