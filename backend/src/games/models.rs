@@ -75,8 +75,7 @@ pub struct PlayerSelectClueRequest {
 
 #[derive(Deserialize)]
 pub struct AnswerRequest {
-    pub player_id: u32,
-    pub correct: bool,
+    pub player_ids: Vec<u32>,
 }
 
 #[derive(Deserialize)]

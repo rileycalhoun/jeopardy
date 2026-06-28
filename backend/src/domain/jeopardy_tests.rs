@@ -132,6 +132,26 @@ fn marking_a_player_correct_transfers_control_to_that_player() {
 }
 
 #[test]
+fn multiple_correct_players_score_and_the_first_submitter_gets_control() {
+    let mut game = JeopardyGame::new(scenario_with_two_clues()).expect("scenario should build");
+    game.apply(GameAction::SelectClue {
+        actor: Selector::Moderator,
+        category_index: 0,
+        clue_index: 0,
+    })
+    .expect("moderator should pick the first clue");
+
+    game.apply(GameAction::ResolveCorrectAnswers {
+        player_ids: vec![2, 1],
+    })
+    .expect("correct answers should resolve the clue");
+
+    assert_eq!(game.state().players[0].score, 200);
+    assert_eq!(game.state().players[1].score, 200);
+    assert_eq!(game.state().current_selector, Selector::Player(2));
+}
+
+#[test]
 fn a_player_cannot_select_when_it_is_not_their_turn() {
     let mut game = JeopardyGame::new(scenario_with_two_clues()).expect("scenario should build");
 

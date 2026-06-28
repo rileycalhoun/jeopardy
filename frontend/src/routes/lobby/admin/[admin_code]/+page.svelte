@@ -40,7 +40,7 @@
 	let infoMessage = $state('');
 	let isLoading = $state(true);
 	let isBusy = $state(false);
-	let selectedPlayerId = $state<number | null>(null);
+	let selectedPlayerIds = $state<number[]>([]);
 	let connectionLabel = $state('Connecting');
 
 	let socket: SafeWebSocket | null = null;
@@ -96,12 +96,9 @@
 
 	function applyGameUpdate(view: GameView) {
 		game = view;
-		if (
-			selectedPlayerId === null ||
-			!view.players.some((player) => player.id === selectedPlayerId)
-		) {
-			selectedPlayerId = view.players[0]?.id ?? null;
-		}
+		selectedPlayerIds = selectedPlayerIds.filter((playerId) =>
+			view.active_clue?.submissions.some((submission) => submission.player_id === playerId)
+		);
 	}
 
 	async function refreshState(code: number) {
@@ -258,10 +255,14 @@
 		errorMessage = toMessage(result.error);
 	}
 
-	async function markAnswer(correct: boolean) {
-		if (adminCode === null || !adminToken || selectedPlayerId === null) return;
+	async function markAnswersCorrect() {
+		if (adminCode === null || !adminToken || !game?.active_clue) return;
+		const playerIds = game.active_clue.submissions
+			.filter((submission) => selectedPlayerIds.includes(submission.player_id))
+			.map((submission) => submission.player_id);
+		if (playerIds.length === 0) return;
 		isBusy = true;
-		const result = await resolveAnswer(adminCode, adminToken, selectedPlayerId, correct);
+		const result = await resolveAnswer(adminCode, adminToken, playerIds);
 		isBusy = false;
 		if (result.ok) {
 			applyGameUpdate(result.value.game);
@@ -456,15 +457,10 @@
 						showAnswer
 					>
 						<div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-center">
-							<select bind:value={selectedPlayerId} class="show-input">
-								{#each game.players as player (player.id)}
-									<option value={player.id}>{player.name}</option>
-								{/each}
-							</select>
 							<button
 								class="show-button-gold bg-emerald-400 hover:bg-emerald-300"
-								disabled={isBusy}
-								onclick={() => markAnswer(true)}
+								disabled={isBusy || selectedPlayerIds.length === 0}
+								onclick={markAnswersCorrect}
 							>
 								Correct
 							</button>
@@ -483,8 +479,12 @@
 									{#each game.active_clue.submissions as submission (submission.player_id)}
 										<button
 											class="min-h-28 rounded-md border border-white/10 bg-board-deep/80 p-4 text-left transition hover:border-gold/60 data-[selected=true]:border-gold data-[selected=true]:bg-gold/10"
-											data-selected={selectedPlayerId === submission.player_id}
-											onclick={() => (selectedPlayerId = submission.player_id)}
+											data-selected={selectedPlayerIds.includes(submission.player_id)}
+											aria-pressed={selectedPlayerIds.includes(submission.player_id)}
+											onclick={() =>
+												(selectedPlayerIds = selectedPlayerIds.includes(submission.player_id)
+													? selectedPlayerIds.filter((id) => id !== submission.player_id)
+													: [...selectedPlayerIds, submission.player_id])}
 										>
 											<span class="block font-display text-sm font-bold text-gold-soft uppercase">
 												{submission.player_name}

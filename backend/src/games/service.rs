@@ -332,9 +332,8 @@ pub(crate) async fn answer_clue(
     apply_action(
         state,
         game.id,
-        GameAction::AttemptAnswer {
-            player_id: request.player_id,
-            correct: request.correct,
+        GameAction::ResolveCorrectAnswers {
+            player_ids: request.player_ids,
         },
     )
     .await
@@ -479,6 +478,9 @@ enum ActionLog {
         player_id: u32,
         correct: bool,
     },
+    CorrectAnswersResolved {
+        player_ids: Vec<u32>,
+    },
     DailyDoubleWagered {
         player_id: u32,
         amount: i32,
@@ -513,6 +515,9 @@ impl From<&GameAction> for ActionLog {
             GameAction::AttemptAnswer { player_id, correct } => Self::ClueResolved {
                 player_id: *player_id,
                 correct: *correct,
+            },
+            GameAction::ResolveCorrectAnswers { player_ids } => Self::CorrectAnswersResolved {
+                player_ids: player_ids.clone(),
             },
             GameAction::SubmitDailyDoubleWager { player_id, amount } => Self::DailyDoubleWagered {
                 player_id: *player_id,
@@ -551,6 +556,9 @@ impl ActionLog {
             Self::ClueSkipped => info!(game_id, "clue skipped"),
             Self::ClueResolved { player_id, correct } => {
                 info!(game_id, player_id, correct, "clue answer resolved")
+            }
+            Self::CorrectAnswersResolved { player_ids } => {
+                info!(game_id, ?player_ids, "correct clue answers resolved")
             }
             Self::DailyDoubleWagered { player_id, amount } => {
                 info!(game_id, player_id, amount, "daily double wager submitted")

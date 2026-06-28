@@ -131,13 +131,12 @@ export function selectClueAsPlayer(
 export function resolveAnswer(
 	adminCode: number,
 	token: string,
-	playerId: number,
-	correct: boolean
+	playerIds: number[]
 ): Promise<Result<{ game: GameView }, FetchError>> {
 	return safeFetchJson(`${env.PUBLIC_API_URL}/games/admin/${adminCode}/answer`, GameStateSchema, {
 		method: 'POST',
 		headers: authJsonHeaders(token),
-		body: JSON.stringify({ player_id: playerId, correct })
+		body: JSON.stringify({ player_ids: playerIds })
 	});
 }
 
