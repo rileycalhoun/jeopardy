@@ -115,6 +115,9 @@ pub enum GameAction {
         player_id: PlayerId,
         correct: bool,
     },
+    ResolveCorrectAnswers {
+        player_ids: Vec<PlayerId>,
+    },
     SubmitDailyDoubleWager {
         player_id: PlayerId,
         amount: i32,
@@ -141,6 +144,8 @@ pub enum GameError {
     ClueAlreadyAnswered,
     ClueOutOfBounds,
     AlreadyAttempted,
+    NoPlayersSelected,
+    DuplicatePlayer,
     NoActiveClue,
     InvalidWager { min: i32, max: i32, attempted: i32 },
     FinalWagerAlreadySubmitted,
@@ -215,6 +220,9 @@ impl JeopardyGame {
             GameAction::SkipClue => self.skip_clue(),
             GameAction::AttemptAnswer { player_id, correct } => {
                 self.attempt_answer(player_id, correct)
+            }
+            GameAction::ResolveCorrectAnswers { player_ids } => {
+                self.resolve_correct_answers(&player_ids)
             }
             GameAction::SubmitDailyDoubleWager { player_id, amount } => {
                 self.submit_daily_double_wager(player_id, amount)
@@ -316,6 +324,34 @@ impl JeopardyGame {
             self.advance_after_clue();
         }
 
+        Ok(())
+    }
+
+    fn resolve_correct_answers(&mut self, player_ids: &[PlayerId]) -> Result<(), GameError> {
+        if self.state.phase != GamePhase::ClueOpen {
+            return Err(GameError::WrongPhase);
+        }
+        if player_ids.is_empty() {
+            return Err(GameError::NoPlayersSelected);
+        }
+
+        let mut player_indices = Vec::with_capacity(player_ids.len());
+        for player_id in player_ids {
+            let player_index = self.player_index(*player_id)?;
+            if player_indices.contains(&player_index) {
+                return Err(GameError::DuplicatePlayer);
+            }
+            player_indices.push(player_index);
+        }
+
+        let value = self.active_clue_value()?;
+        for player_index in player_indices {
+            self.state.players[player_index].score += value;
+        }
+        self.state.current_selector = Selector::Player(player_ids[0]);
+        self.mark_active_clue_answered()?;
+        self.state.active_clue = None;
+        self.advance_after_clue();
         Ok(())
     }
 
